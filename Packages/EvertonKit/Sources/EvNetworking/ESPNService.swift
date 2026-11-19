@@ -6,6 +6,7 @@ import EvCore
 public struct ESPNService: FootballService {
     private let session: URLSession
     private let cache: DiskCache
+    private let bio: WikidataBio
     private let site = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1"
     private let v2 = "https://site.api.espn.com/apis/v2/sports/soccer/eng.1"
 
@@ -14,6 +15,7 @@ public struct ESPNService: FootballService {
     public init(session: URLSession = .shared, cache: DiskCache = DiskCache()) {
         self.session = session
         self.cache = cache
+        self.bio = WikidataBio(session: session, cache: cache)
     }
 
     private enum TTL {
@@ -70,7 +72,9 @@ public struct ESPNService: FootballService {
 
     public func squad(of clubID: Int) async throws -> [Player] {
         let payload = try await fetch("\(site)/teams/\(clubID)/roster", ttl: TTL.roster, as: ESPNRoster.self)
-        return ESPNMapping.roster(payload)
+        let players = ESPNMapping.roster(payload)
+        // 에버턴은 Wikidata 로 신상을 교차 검증한다. 다른 구단은 구단 QID 해결이 필요해 수동 보정만 적용한다.
+        return clubID == EvertonInfo.teamID ? await bio.enrich(players) : PlayerBio.applyOverrides(players)
     }
 
     public func clubs() async throws -> [ClubInfo] {

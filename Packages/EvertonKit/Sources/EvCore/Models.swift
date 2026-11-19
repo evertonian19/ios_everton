@@ -207,11 +207,20 @@ public struct Player: Hashable, Codable, Sendable, Identifiable {
     public var birthDate: Date?
     public var birthPlace: String?
     public var flagURL: URL?
+    /// 신상(생년월일·키·국적)의 출처: "espn"(원본) / "wikidata"(교차 검증 후 보정) / "override"(수동 보정).
+    public var bioSource: String
+    /// 출처 사이에 값이 달랐을 때 ESPN 원본 값 (항목 이름 → 원본 문구). 비어 있으면 일치.
+    public var bioDisputed: [String: String]
+    public var bioVerified: Bool
 
     public init(id: Int, name: String, number: Int?, position: Position, age: Int?,
                 nationality: String? = nil, photoURL: URL?, stats: PlayerStats? = nil,
                 heightCM: Int? = nil, weightKG: Int? = nil, birthDate: Date? = nil, birthPlace: String? = nil,
-                flagURL: URL? = nil) {
+                flagURL: URL? = nil, bioSource: String = "espn", bioDisputed: [String: String] = [:],
+                bioVerified: Bool = false) {
+        self.bioSource = bioSource
+        self.bioDisputed = bioDisputed
+        self.bioVerified = bioVerified
         self.flagURL = flagURL
         self.heightCM = heightCM
         self.weightKG = weightKG

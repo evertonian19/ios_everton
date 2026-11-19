@@ -135,14 +135,21 @@ struct PlayerDetailView: View {
     private var info: some View {
         FMPanel("선수 정보") {
             VStack(spacing: 0) {
-                infoRow("국적", player.nationality)
+                infoRow("국적", player.nationality, disputed: player.bioDisputed["nationality"])
                 infoRow("포지션", player.position.title)
                 infoRow("나이", player.age.map { "\($0)세" })
-                infoRow("생년월일", player.birthDate.map { Fmt.birthday($0) })
-                infoRow("키", player.heightCM.map { "\($0) cm" })
+                infoRow("생년월일", player.birthDate.map { Fmt.birthday($0) }, disputed: player.bioDisputed["birthDate"])
+                infoRow("키", player.heightCM.map { "\($0) cm" }, disputed: player.bioDisputed["heightCM"])
                 infoRow("몸무게", player.weightKG.map { "\($0) kg" })
                 infoRow("출생지", player.birthPlace)
                 infoRow("등번호", player.number.map(String.init))
+                Text("신상 출처: \(bioSourceText)")
+                    .font(.caption2).foregroundStyle(Theme.textSecondary).padding(.top, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if !player.bioDisputed.isEmpty {
+                    Text("ESPN 원본과 값이 달라 보정했습니다 (동명이인 프로필이 섞인 것으로 보임).")
+                        .font(.caption2).foregroundStyle(Theme.gold).frame(maxWidth: .infinity, alignment: .leading)
+                }
                 Text("사진·평점·패스 지표는 데이터 출처(\(model.services.sourceName))가 제공하지 않아 표시하지 않습니다.")
                     .font(.caption2).foregroundStyle(Theme.textSecondary).padding(.top, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -150,12 +157,24 @@ struct PlayerDetailView: View {
         }
     }
 
-    private func infoRow(_ label: String, _ value: String?) -> some View {
+    private var bioSourceText: String {
+        switch player.bioSource {
+        case "override": return "수동 보정"
+        case "wikidata": return "Wikidata 보정"
+        default: return player.bioVerified ? "ESPN · Wikidata 교차 확인" : "ESPN 원본 (미검증)"
+        }
+    }
+
+    private func infoRow(_ label: String, _ value: String?, disputed: String? = nil) -> some View {
         VStack(spacing: 0) {
             HStack {
                 Text(label).font(.footnote).foregroundStyle(Theme.textSecondary)
                 Spacer()
                 Text(value ?? "-").font(.footnote.weight(.semibold)).foregroundStyle(Theme.textPrimary)
+                if let disputed {
+                    Image(systemName: "exclamationmark.circle.fill").font(.caption).foregroundStyle(Theme.gold)
+                        .accessibilityLabel("ESPN 원본: \(disputed)")
+                }
             }
             .padding(.vertical, 7)
             Divider().overlay(Theme.line.opacity(0.5))
