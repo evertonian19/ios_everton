@@ -73,8 +73,13 @@ public struct ESPNService: FootballService {
     public func squad(of clubID: Int) async throws -> [Player] {
         let payload = try await fetch("\(site)/teams/\(clubID)/roster", ttl: TTL.roster, as: ESPNRoster.self)
         let players = ESPNMapping.roster(payload)
-        // 에버턴은 Wikidata 로 신상을 교차 검증한다. 다른 구단은 구단 QID 해결이 필요해 수동 보정만 적용한다.
-        let enriched = clubID == EvertonInfo.teamID ? await bio.enrich(players) : PlayerBio.applyOverrides(players)
+        // 전 구단 Wikidata 신상 교차 검증. 에버턴은 QID 확정, 다른 구단은 이름 검색(실패하면 수동 보정만 적용).
+        var enriched = PlayerBio.applyOverrides(players)
+        if clubID == EvertonInfo.teamID {
+            enriched = await bio.enrich(players)
+        } else if let name = await espnNames(clubID: clubID)?.first, let qid = await bio.teamQID(forClub: name) {
+            enriched = await bio.enrich(players, teamQID: qid)
+        }
         // 사진: 수동 지정 > 프리미어리그 공식(개인 열람용) > Commons > 이니셜. 수동 지정은 PlayerBio.overrides 에서 따로 관리한다.
         return await attachPLPhotos(enriched, clubID: clubID)
     }

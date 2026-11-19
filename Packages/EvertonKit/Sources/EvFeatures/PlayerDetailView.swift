@@ -106,7 +106,7 @@ struct PlayerDetailView: View {
     @ViewBuilder
     private var records: some View {
         if rows.isEmpty {
-            FMPanel("시즌 기록") { Text("시즌 기록이 없어요.").font(.footnote).foregroundStyle(Theme.textSecondary) }
+            FMPanel("시즌 기록") { Text("ESPN 에 이 선수의 시즌 기록이 없어요(출전 전이거나 등록 직후).").font(.footnote).foregroundStyle(Theme.textSecondary) }
         } else {
             FMPanel("시즌 기록") {
                 VStack(spacing: 0) {
@@ -120,6 +120,9 @@ struct PlayerDetailView: View {
                         .padding(.vertical, 6)
                         Divider().overlay(Theme.line.opacity(0.5))
                     }
+                    Text("출처: ESPN 시즌 누적 기록(비공식 API). 경기 이벤트와의 대조 검증은 에버턴 선수만 수행합니다.")
+                        .font(.caption2).foregroundStyle(Theme.textSecondary).padding(.top, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }

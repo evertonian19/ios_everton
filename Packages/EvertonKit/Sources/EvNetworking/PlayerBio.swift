@@ -289,6 +289,19 @@ public actor WikidataBio {
     }
 
     /// 선수 목록을 보정해서 돌려준다. 네트워크/쿨다운 문제는 조용히 넘기고 ESPN 값을 그대로 둔다.
+    /// 구단 이름으로 Wikidata QID 를 찾는다 ("football club" · "england" 설명, 여자팀/유스/리저브 제외). 유일한 후보가 아니면 nil.
+    public func teamQID(forClub name: String) async -> String? {
+        guard !name.isEmpty else { return nil }
+        guard let data = try? await call(["action": "wbsearchentities", "search": name, "language": "en", "type": "item", "limit": "10"]),
+              let found = try? JSONDecoder().decode(Search.self, from: data) else { return nil }
+        let hits = (found.search ?? []).filter { hit in
+            let d = (hit.description ?? "").lowercased()
+            return d.contains("football club") && d.contains("england")
+                && !["women", "reserves", "under-", "academy"].contains { d.contains($0) }
+        }
+        return hits.first?.id
+    }
+
     public func enrich(_ players: [Player], teamQID: String? = nil) async -> [Player] {
         let team = teamQID ?? everton
         var result = players

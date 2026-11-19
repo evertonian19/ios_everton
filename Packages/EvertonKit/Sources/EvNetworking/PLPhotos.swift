@@ -4,58 +4,21 @@ import EvCore
 /// 프리미어리그 공식 사이트의 선수 사진 (개인 기기 열람용).
 /// 비공개 API 는 쓰지 않는다: 브라우저가 받는 공개 선수단 HTML 에서 선수 ID 를 읽고, 사진은 공개 이미지 서버에서 불러온다.
 /// 스토어 배포 등 공개 서비스로 낼 때는 `enabled` 를 false 로 바꿔 Commons 사진·이니셜만 쓰게 한다.
+/// 구성: PLSquadParser(파싱·이름 매칭) · PLClubDirectory(구단 id 탐색) · PLPhotos(부착).
 public enum PLPhotos {
     public static var enabled = true
-    /// ESPN 구단 id → (PL 구단 id, slug). 다른 구단은 매핑이 없어 사진을 붙이지 않는다.
-    static let clubs: [Int: (id: Int, slug: String)] = [368: (11, "everton")]
     static let site = "https://www.premierleague.com"
     static let credit = PhotoCredit(author: "Premier League", license: "공식 사이트 이미지(개인 열람용)")
-
-    struct Entry: Equatable { let id: String; let slug: String }
 
     static func imageURL(_ id: String) -> URL? {
         URL(string: "https://resources.premierleague.com/premierleague25/photos/players/110x140/\(id).png")
     }
 
-    /// 선수단 HTML → 선수 목록(등장 순서, 중복 제거).
-    static func parseSquad(_ html: String) -> [Entry] {
-        guard let regex = try? NSRegularExpression(pattern: #"/en/players/(\d+)/([a-z0-9-]+)/overview"#) else { return [] }
-        let range = NSRange(html.startIndex..., in: html)
-        var seen = Set<String>()
-        var out: [Entry] = []
-        for m in regex.matches(in: html, range: range) {
-            guard let idRange = Range(m.range(at: 1), in: html), let slugRange = Range(m.range(at: 2), in: html) else { continue }
-            let id = String(html[idRange])
-            if seen.insert(id).inserted { out.append(Entry(id: id, slug: String(html[slugRange]))) }
-        }
-        return out
-    }
-
-    /// 이름/slug 비교용 키: ASCII 알파벳만 남긴다 (Nørgaard·Röhl 은 slug 에서도 같은 글자가 빠진다).
-    static func key(_ text: String) -> String {
-        String(text.lowercased().unicodeScalars.filter { $0.value >= 97 && $0.value <= 122 }.map(Character.init))
-    }
-
-    static func match(_ name: String, _ entries: [Entry]) -> Entry? {
-        let want = key(name)
-        let hits = entries.filter { key($0.slug.replacingOccurrences(of: "-", with: " ")) == want }
-        if hits.count == 1 { return hits[0] }
-        if !hits.isEmpty { return nil }
-        let parts = name.split(whereSeparator: { $0 == " " || $0 == "-" }).map(String.init)
-        guard parts.count >= 2, let first = key(parts[0]).first else { return nil }
-        let last = key(parts[parts.count - 1])
-        let candidates = entries.filter { entry in
-            let pieces = entry.slug.split(separator: "-")
-            return pieces.last.map { key(String($0)) } == last && key(entry.slug).first == first
-        }
-        return candidates.count == 1 ? candidates[0] : nil
-    }
-
     /// 선수들에게 PL 사진을 붙인다(Commons 보다 우선). `keep` 의 선수는 건드리지 않는다.
-    static func attach(_ players: [Player], entries: [Entry], validate: @Sendable (String) async -> Bool,
+    static func attach(_ players: [Player], entries: [PLSquadParser.Entry], validate: @Sendable (String) async -> Bool,
                        keep: Set<Int> = []) async -> [Player] {
-        var found: [Int: Entry] = [:]
-        for p in players where !keep.contains(p.id) { if let e = match(p.name, entries) { found[p.id] = e } }
+        var found: [Int: PLSquadParser.Entry] = [:]
+        for p in players where !keep.contains(p.id) { if let e = PLSquadParser.match(p.name, entries) { found[p.id] = e } }
         var ok: [String: Bool] = [:]
         await withTaskGroup(of: (String, Bool).self) { group in
             for id in Set(found.values.map(\.id)) { group.addTask { (id, await validate(id)) } }
@@ -73,11 +36,13 @@ public enum PLPhotos {
 }
 
 extension ESPNService {
-    /// 에버턴 선수단 HTML 을 24시간 캐시로 읽어 사진을 붙인다. 실패하면 받은 선수 목록 그대로.
+    /// 구단의 PL 선수단 HTML 을 24시간 캐시로 읽어 사진을 붙인다. 구단 연결이나 네트워크가 실패하면 받은 목록 그대로.
     func attachPLPhotos(_ players: [Player], clubID: Int, keep: Set<Int> = []) async -> [Player] {
-        guard PLPhotos.enabled, let club = PLPhotos.clubs[clubID],
-              let url = URL(string: "\(PLPhotos.site)/en/clubs/\(club.id)/\(club.slug)/squad") else { return players }
-        let key = "pl_" + url.absoluteString
+        guard PLPhotos.enabled, let names = await espnNames(clubID: clubID) else { return players }
+        let directory = PLClubDirectory(session: session, cache: cache)
+        guard let plID = PLClubDirectory.clubID(for: names, in: await directory.clubs()),
+              let url = URL(string: "\(PLPhotos.site)/en/clubs/\(plID)/x/squad") else { return players }
+        let key = "pl_squad_\(plID)"
         var html: String?
         if let cached = await cache.data(for: key, maxAge: 86_400) { html = String(data: cached, encoding: .utf8) }
         if html == nil {
@@ -92,7 +57,7 @@ extension ESPNService {
             }
         }
         guard let html else { return players }
-        let entries = PLPhotos.parseSquad(html)
+        let entries = PLSquadParser.parseSquad(html)
         guard !entries.isEmpty else { return players }
         let session = self.session
         return await PLPhotos.attach(players, entries: entries, validate: { id in
@@ -104,5 +69,10 @@ extension ESPNService {
             // 사진이 없는 선수는 약 6KB 자리표시 이미지가 온다 → 2만 바이트 이상일 때만 실제 사진으로 본다.
             return http.statusCode == 200 && http.expectedContentLength > 20_000
         }, keep: keep)
+    }
+
+    func espnNames(clubID: Int) async -> [String]? {
+        guard let info = try? await clubs().first(where: { $0.club.id == clubID }) else { return nil }
+        return [info.club.name, info.club.shortName].compactMap { $0 }
     }
 }
