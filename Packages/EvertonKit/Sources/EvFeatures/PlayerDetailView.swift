@@ -160,7 +160,14 @@ struct PlayerDetailView: View {
 
     @ViewBuilder
     private var photoCreditLine: some View {
-        if let credit = player.photoCredit {
+        if let credit = player.photoCredit, credit.author == "Premier League" {
+            HStack(spacing: 4) {
+                if let page = credit.pageURL { Link("Premier League 공식 사이트", destination: page) } else { Text("Premier League 공식 사이트") }
+                Text("· 개인 기기 열람용 이미지입니다.")
+            }
+            .font(.caption2).foregroundStyle(Theme.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
+        } else if let credit = player.photoCredit {
             HStack(spacing: 4) {
                 Text("사진: \(credit.author) · \(credit.license) ·")
                 if let page = credit.pageURL { Link("Wikimedia Commons", destination: page) } else { Text("Wikimedia Commons") }
@@ -168,7 +175,7 @@ struct PlayerDetailView: View {
             .font(.caption2).foregroundStyle(Theme.textSecondary)
             .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
         } else {
-            Text("사진: 자유 라이선스 사진이 없어 이니셜로 표시합니다.")
+            Text("사진을 구하지 못해 이니셜로 표시합니다.")
                 .font(.caption2).foregroundStyle(Theme.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
         }

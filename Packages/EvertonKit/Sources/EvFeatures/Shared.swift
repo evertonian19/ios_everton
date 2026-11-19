@@ -118,6 +118,8 @@ struct RosterTable: View {
         return HStack(spacing: 6) {
             Text(player.number.map(String.init) ?? "-").font(.caption.weight(.bold)).foregroundStyle(Theme.textSecondary)
                 .frame(width: 22, alignment: .trailing)
+            PlayerPhoto(url: player.photoURL, name: player.name, size: 22)
+                .clipShape(Circle())
             PositionTag(player.position)
             FlagImage(player.flagURL)
             Text(player.shortName).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.textPrimary)

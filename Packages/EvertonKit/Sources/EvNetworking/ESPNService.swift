@@ -4,8 +4,8 @@ import EvCore
 /// ESPN 공개 API(키 불필요)에서 프리미어리그 데이터를 읽는다. 비공식 API 라서 응답을 디스크에 캐시하고,
 /// 네트워크가 실패하면 오래된 캐시를 대신 보여 준다. ESPN 이 주지 않는 값(평점·사진 등)은 만들지 않는다.
 public struct ESPNService: FootballService {
-    private let session: URLSession
-    private let cache: DiskCache
+    let session: URLSession
+    let cache: DiskCache
     private let bio: WikidataBio
     private let site = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1"
     private let v2 = "https://site.api.espn.com/apis/v2/sports/soccer/eng.1"
@@ -74,7 +74,9 @@ public struct ESPNService: FootballService {
         let payload = try await fetch("\(site)/teams/\(clubID)/roster", ttl: TTL.roster, as: ESPNRoster.self)
         let players = ESPNMapping.roster(payload)
         // 에버턴은 Wikidata 로 신상을 교차 검증한다. 다른 구단은 구단 QID 해결이 필요해 수동 보정만 적용한다.
-        return clubID == EvertonInfo.teamID ? await bio.enrich(players) : PlayerBio.applyOverrides(players)
+        let enriched = clubID == EvertonInfo.teamID ? await bio.enrich(players) : PlayerBio.applyOverrides(players)
+        // 사진: 수동 지정 > 프리미어리그 공식(개인 열람용) > Commons > 이니셜. 수동 지정은 PlayerBio.overrides 에서 따로 관리한다.
+        return await attachPLPhotos(enriched, clubID: clubID)
     }
 
     public func clubs() async throws -> [ClubInfo] {
