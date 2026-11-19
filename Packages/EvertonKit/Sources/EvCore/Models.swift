@@ -193,6 +193,20 @@ public struct PlayerStats: Hashable, Codable, Sendable {
     public var contribution: Int { goals + assists }
 }
 
+public struct PhotoCredit: Hashable, Codable, Sendable {
+    public let author: String
+    public let license: String
+    public let licenseURL: URL?
+    public let pageURL: URL?
+
+    public init(author: String, license: String, licenseURL: URL? = nil, pageURL: URL? = nil) {
+        self.author = author
+        self.license = license
+        self.licenseURL = licenseURL
+        self.pageURL = pageURL
+    }
+}
+
 public struct Player: Hashable, Codable, Sendable, Identifiable {
     public let id: Int
     public let name: String
@@ -200,7 +214,9 @@ public struct Player: Hashable, Codable, Sendable, Identifiable {
     public let position: Position
     public let age: Int?
     public let nationality: String?
-    public let photoURL: URL?
+    public var photoURL: URL?
+    /// 사진을 쓸 때 반드시 함께 보여 줘야 하는 저작자·라이선스 표기 (Wikimedia Commons).
+    public var photoCredit: PhotoCredit?
     public var stats: PlayerStats?
     public var heightCM: Int?
     public var weightKG: Int?
@@ -217,7 +233,8 @@ public struct Player: Hashable, Codable, Sendable, Identifiable {
                 nationality: String? = nil, photoURL: URL?, stats: PlayerStats? = nil,
                 heightCM: Int? = nil, weightKG: Int? = nil, birthDate: Date? = nil, birthPlace: String? = nil,
                 flagURL: URL? = nil, bioSource: String = "espn", bioDisputed: [String: String] = [:],
-                bioVerified: Bool = false) {
+                bioVerified: Bool = false, photoCredit: PhotoCredit? = nil) {
+        self.photoCredit = photoCredit
         self.bioSource = bioSource
         self.bioDisputed = bioDisputed
         self.bioVerified = bioVerified

@@ -48,6 +48,24 @@ public enum PlayerBio {
         return true
     }
 
+    /// 사진 라이선스가 자유(CC BY·CC BY-SA·CC0·퍼블릭 도메인)인지. NC/ND·Fair use 는 거부.
+    static func isFreeLicense(_ text: String) -> Bool {
+        let t = text.lowercased().trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty else { return false }
+        let bad = ["fair use", "non-free", "all rights reserved", "-nc", "-nd", " nc", " nd"]
+        if bad.contains(where: { t.contains($0) }) { return false }
+        return ["cc by", "cc-by", "cc0", "cc zero", "public domain", "pd", "attribution", "gfdl"].contains { t.hasPrefix($0) }
+    }
+
+    /// HTML 태그·엔티티를 제거한 짧은 문구 (작성자 표기용).
+    static func plain(_ html: String?) -> String {
+        var text = (html ?? "").replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        for (entity, char) in [("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&#39;", "'")] {
+            text = text.replacingOccurrences(of: entity, with: char)
+        }
+        return String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+    }
+
     static func normalize(_ text: String) -> String {
         let folded = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en"))
         let cleaned = folded.replacingOccurrences(of: "'", with: "")
@@ -107,6 +125,7 @@ public actor WikidataBio {
     private var blockedUntil = Date.distantPast
     private let ttl: TimeInterval = 7 * 86_400
     private let api = "https://www.wikidata.org/w/api.php"
+    private let commonsAPI = "https://commons.wikimedia.org/w/api.php"
     private let everton = "Q5794"                      // Everton F.C. (다른 구단 QID 는 이름 검색으로 찾는다)
 
     public init(session: URLSession = .shared, cache: DiskCache = DiskCache()) {
@@ -114,8 +133,8 @@ public actor WikidataBio {
         self.cache = cache
     }
 
-    private func call(_ items: [String: String]) async throws -> Data {
-        var comps = URLComponents(string: api)!
+    private func call(_ items: [String: String], base: String? = nil) async throws -> Data {
+        var comps = URLComponents(string: base ?? api)!
         comps.queryItems = (items.merging(["format": "json", "formatversion": "2"]) { $1 })
             .sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
         let url = comps.url!
@@ -165,7 +184,7 @@ public actor WikidataBio {
             }
         }
         struct Snak: Decodable { struct DV: Decodable { let value: Value? }; let datavalue: DV? }
-        struct Claim: Decodable { let mainsnak: Snak?; let qualifiers: [String: [Snak]]? }
+        struct Claim: Decodable { let mainsnak: Snak?; let qualifiers: [String: [Snak]]?; let rank: String? }
         struct Label: Decodable { let value: String }
         struct Entity: Decodable {
             let labels: [String: Label]?
@@ -188,6 +207,16 @@ public actor WikidataBio {
 
     private func ids(_ e: Entities.Entity, _ prop: String) -> [String] {
         e.claims?[prop]?.compactMap { $0.mainsnak?.datavalue?.value?.id } ?? []
+    }
+
+    private func image(_ e: Entities.Entity) -> String? {
+        let claims = e.claims?["P18"] ?? []
+        return (claims.first { $0.rank == "preferred" } ?? claims.first)?.mainsnak?.datavalue?.value?.text
+    }
+
+    private func birthDay(_ e: Entities.Entity) -> String? {
+        guard let v = firstValue(e, "P569"), (v.precision ?? 0) >= 11, let t = v.time else { return nil }
+        return String(t.drop(while: { $0 == "+" }).prefix(10))
     }
 
     private func isCurrentMember(_ e: Entities.Entity, of team: String) -> Bool {
@@ -221,6 +250,44 @@ public actor WikidataBio {
         return PlayerBio.sane(out) ? out : nil
     }
 
+    // MARK: 사진 (Wikimedia Commons, 자유 라이선스만)
+
+    private struct ImageInfo: Decodable {
+        struct Meta: Decodable { let value: String? }
+        struct Info: Decodable {
+            let thumburl: String?
+            let descriptionurl: String?
+            let extmetadata: [String: Meta]?
+        }
+        struct Page: Decodable { let title: String?; let imageinfo: [Info]? }
+        struct Query: Decodable { let pages: [Page]? }
+        let query: Query?
+    }
+
+    /// 파일명 → (썸네일, 표기). 자유 라이선스가 아니거나 응답이 없으면 빠진다.
+    private func commons(_ files: [String]) async -> [String: (url: URL, credit: PhotoCredit)] {
+        var out: [String: (url: URL, credit: PhotoCredit)] = [:]
+        let names = Array(Set(files.map { $0.replacingOccurrences(of: "_", with: " ") })).sorted()
+        for start in stride(from: 0, to: names.count, by: 40) {
+            let chunk = Array(names[start..<min(start + 40, names.count)])
+            guard let data = try? await call(["action": "query", "prop": "imageinfo", "iiprop": "url|extmetadata", "iiurlwidth": "320",
+                                              "titles": chunk.map { "File:" + $0 }.joined(separator: "|")], base: commonsAPI),
+                  let decoded = try? JSONDecoder().decode(ImageInfo.self, from: data) else { continue }
+            for page in decoded.query?.pages ?? [] {
+                guard let info = page.imageinfo?.first, let thumb = info.thumburl.flatMap(URL.init(string:)),
+                      let name = page.title?.split(separator: ":", maxSplits: 1).last.map(String.init) else { continue }
+                let meta = info.extmetadata ?? [:]
+                let license = PlayerBio.plain(meta["LicenseShortName"]?.value)
+                guard PlayerBio.isFreeLicense(license) else { continue }
+                let author = PlayerBio.plain(meta["Artist"]?.value)
+                out[name] = (thumb, PhotoCredit(author: author.isEmpty ? "Wikimedia Commons" : author, license: license,
+                                                licenseURL: meta["LicenseUrl"]?.value.flatMap(URL.init(string:)),
+                                                pageURL: info.descriptionurl.flatMap(URL.init(string:))))
+            }
+        }
+        return out
+    }
+
     /// 선수 목록을 보정해서 돌려준다. 네트워크/쿨다운 문제는 조용히 넘기고 ESPN 값을 그대로 둔다.
     public func enrich(_ players: [Player], teamQID: String? = nil) async -> [Player] {
         let team = teamQID ?? everton
@@ -240,9 +307,23 @@ public actor WikidataBio {
                 if hits.count == 1 { matched[p.id] = hits[0]; wanted.formUnion(ids(hits[0], "P27") + ids(hits[0], "P19")) }
             }
             let labels = try await entities(Array(wanted))
+            // 사진은 정체가 확실한 항목에서만: 소속 일치로 매칭됐거나, 이름·생년월일이 ESPN 과 같은 단 하나의 후보.
+            var photoFile: [Int: String] = [:]
+            for p in players {
+                if let e = matched[p.id], let file = image(e) { photoFile[p.id] = file; continue }
+                guard matched[p.id] == nil, let born = p.birthDate.map(PlayerBio.dayText) else { continue }
+                let same = (candidates[p.id] ?? []).compactMap { ents[$0] }.filter { nameMatches(p.name, $0) && birthDay($0) == born }
+                if same.count == 1, let file = image(same[0]) { photoFile[p.id] = file }
+            }
+            let pictures = await commons(Array(Set(photoFile.values)))
             result = players.map { p in
-                if let e = matched[p.id], let found = facts(e, labels: labels) { return PlayerBio.apply(p, found, source: "wikidata") }
-                return p
+                var q = p
+                if let e = matched[p.id], let found = facts(e, labels: labels) { q = PlayerBio.apply(p, found, source: "wikidata") }
+                if let file = photoFile[p.id], let pic = pictures[file.replacingOccurrences(of: "_", with: " ")] {
+                    q.photoURL = pic.url
+                    q.photoCredit = pic.credit
+                }
+                return q
             }
         } catch {
             // 429·네트워크 오류: 이미 캐시된 응답으로 얻은 만큼만 반영된 상태. 다음 새로고침에서 이어서 채운다.

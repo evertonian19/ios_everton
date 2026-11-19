@@ -143,6 +143,7 @@ struct PlayerDetailView: View {
                 infoRow("몸무게", player.weightKG.map { "\($0) kg" })
                 infoRow("출생지", player.birthPlace)
                 infoRow("등번호", player.number.map(String.init))
+                photoCreditLine
                 Text("신상 출처: \(bioSourceText)")
                     .font(.caption2).foregroundStyle(Theme.textSecondary).padding(.top, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -150,10 +151,26 @@ struct PlayerDetailView: View {
                     Text("ESPN 원본과 값이 달라 보정했습니다 (동명이인 프로필이 섞인 것으로 보임).")
                         .font(.caption2).foregroundStyle(Theme.gold).frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Text("사진·평점·패스 지표는 데이터 출처(\(model.services.sourceName))가 제공하지 않아 표시하지 않습니다.")
+                Text("평점·패스 지표는 데이터 출처(\(model.services.sourceName))가 제공하지 않아 표시하지 않습니다.")
                     .font(.caption2).foregroundStyle(Theme.textSecondary).padding(.top, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var photoCreditLine: some View {
+        if let credit = player.photoCredit {
+            HStack(spacing: 4) {
+                Text("사진: \(credit.author) · \(credit.license) ·")
+                if let page = credit.pageURL { Link("Wikimedia Commons", destination: page) } else { Text("Wikimedia Commons") }
+            }
+            .font(.caption2).foregroundStyle(Theme.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
+        } else {
+            Text("사진: 자유 라이선스 사진이 없어 이니셜로 표시합니다.")
+                .font(.caption2).foregroundStyle(Theme.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
         }
     }
 
