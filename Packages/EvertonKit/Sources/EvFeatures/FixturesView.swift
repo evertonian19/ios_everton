@@ -5,18 +5,14 @@ import EvDesign
 struct FixturesView: View {
     @Environment(AppModel.self) private var model
 
-    private enum Filter: String, CaseIterable, Identifiable {
-        case all = "전체", upcoming = "예정", results = "결과"
-        var id: String { rawValue }
-    }
-
+    private enum Filter: Hashable { case all, upcoming, results }
     @State private var filter: Filter = .all
 
     private func filtered(_ matches: [Match]) -> [Match] {
         switch filter {
         case .all: return matches
         case .upcoming: return matches.filter { $0.phase != .finished }
-        case .results: return matches.filter { $0.phase == .finished }.reversed()
+        case .results: return matches.filter { $0.phase == .finished }
         }
     }
 
@@ -34,30 +30,24 @@ struct FixturesView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
-                    Picker("필터", selection: $filter) {
-                        ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-
+                VStack(spacing: 10) {
+                    FMTabs([(Filter.all, "전체"), (Filter.upcoming, "예정"), (Filter.results, "결과")], selection: $filter)
                     LoadStateView(state: model.matches, retry: { await model.loadMatches() }) { matches in
-                        VStack(spacing: 18) {
+                        VStack(spacing: 10) {
                             ForEach(grouped(filtered(matches)), id: \.month) { group in
-                                VStack(spacing: 8) {
-                                    SectionTitle(group.month, trailing: "\(group.items.count)경기")
+                                FMPanel(group.month, trailing: "\(group.items.count)경기") {
                                     VStack(spacing: 0) {
                                         ForEach(group.items) { match in
                                             NavigationLink(value: match) { MatchRow(match: match) }.buttonStyle(.plain)
-                                            if match.id != group.items.last?.id { Divider().overlay(Theme.line.opacity(0.5)) }
                                         }
                                     }
-                                    .evCard()
                                 }
                             }
                         }
                     }
+                    SourceFooter()
                 }
-                .padding(16)
+                .padding(10)
             }
             .background(Theme.background)
             .navigationTitle("일정")

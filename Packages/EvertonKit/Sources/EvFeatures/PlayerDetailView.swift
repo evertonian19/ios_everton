@@ -3,122 +3,162 @@ import EvCore
 import EvDesign
 
 struct PlayerDetailView: View {
+    @Environment(AppModel.self) private var model
     let player: Player
 
-    private var tiles: [(label: String, value: String)] {
-        guard let s = player.stats else { return [] }
-        if player.position == .goalkeeper {
-            return [("출전", "\(s.appearances)"), ("출전 시간", "\(s.minutes)'"), ("선방", "\(s.saves)"),
-                    ("실점", "\(s.conceded)"), ("패스 성공률", "\(s.passAccuracy)%"), ("경고", "\(s.yellow)")]
-        }
-        return [("출전", "\(s.appearances)"), ("출전 시간", "\(s.minutes)'"), ("골", "\(s.goals)"),
-                ("도움", "\(s.assists)"), ("슈팅", "\(s.shots)"), ("유효슈팅", "\(s.shotsOnTarget)"),
-                ("키패스", "\(s.keyPasses)"), ("패스 성공률", "\(s.passAccuracy)%"), ("태클", "\(s.tackles)"),
-                ("드리블", "\(s.dribbles)"), ("경고", "\(s.yellow)"), ("퇴장", "\(s.red)")]
-    }
+    private enum Tab: Hashable { case overview, stats, info }
+    @State private var tab: Tab = .overview
+
+    private var stats: PlayerStats? { player.stats }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 10) {
                 hero
-                bodyCard
-                strengthTags
-                let metrics = PlayerMetrics.radar(for: player)
-                if !metrics.isEmpty {
-                    VStack(spacing: 4) {
-                        SectionTitle("능력치 레이더")
-                        RadarChart(labels: metrics.map(\.label), values: metrics.map(\.value))
-                            .frame(maxWidth: 300)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .evCard()
-                }
-                if !tiles.isEmpty {
-                    VStack(spacing: 8) {
-                        SectionTitle("시즌 기록")
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                            ForEach(tiles, id: \.label) { tile in
-                                VStack(spacing: 4) {
-                                    Text(tile.value)
-                                        .font(.system(size: 22, weight: .heavy, design: .rounded))
-                                        .foregroundStyle(Theme.textPrimary)
-                                    Text(tile.label).font(.caption2).foregroundStyle(Theme.textSecondary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            }
-                        }
-                    }
-                } else {
-                    Text("이번 시즌 기록이 아직 없습니다.").font(.footnote).foregroundStyle(Theme.textSecondary)
+                FMTabs([(Tab.overview, "개요"), (Tab.stats, "기록"), (Tab.info, "정보")], selection: $tab)
+                switch tab {
+                case .overview: overview
+                case .stats: records
+                case .info: info
                 }
             }
-            .padding(16)
+            .padding(10)
         }
         .background(Theme.background)
         .navigationTitle(player.shortName)
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var bodyCard: some View {
-        HStack {
-            bodyFact("키", Fmt.height(player.heightCM))
-            bodyFact("몸무게", Fmt.weight(player.weightKG))
-            bodyFact("생년월일", Fmt.birthday(player.birthDate))
-            bodyFact("출생지", player.birthPlace ?? "-")
-        }
-        .evCard()
-    }
-
-    private func bodyFact(_ label: String, _ value: String) -> some View {
-        VStack(spacing: 3) {
-            Text(value).font(.footnote.weight(.bold)).foregroundStyle(Theme.textPrimary)
-                .lineLimit(2).multilineTextAlignment(.center).minimumScaleFactor(0.7)
-            Text(label).font(.caption2).foregroundStyle(Theme.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    /// 시즌 스탯에서 계산한 강점(데이터가 부족하면 표시하지 않음).
-    @ViewBuilder
-    private var strengthTags: some View {
-        let strengths = PlayerMetrics.strengths(for: player)
-        if !strengths.isEmpty {
-            HStack(spacing: 8) {
-                Text("강점").font(.caption.weight(.heavy)).foregroundStyle(Theme.textSecondary)
-                ForEach(strengths, id: \.self) { item in
-                    Text(item).font(.footnote.weight(.bold)).foregroundStyle(.black.opacity(0.85))
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(Theme.gold, in: Capsule())
-                }
-                Spacer()
-            }
-        }
-    }
-
     private var hero: some View {
-        HStack(spacing: 16) {
-            PlayerPhoto(url: player.photoURL, name: player.name, size: 104)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    if let number = player.number {
-                        Text("#\(number)").font(.title3.weight(.black)).foregroundStyle(Theme.gold)
-                    }
+        HStack(spacing: 14) {
+            PlayerPhoto(url: player.photoURL, name: player.name, size: 74)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("\(player.number.map { "#\($0) " } ?? "")\(player.name)")
+                    .font(.headline.weight(.bold)).foregroundStyle(.white)
+                HStack(spacing: 6) {
                     PositionTag(player.position)
+                    Text("\(player.position.title) · \(player.age.map { "\($0)세" } ?? "-")")
+                        .font(.footnote).foregroundStyle(Color(hex: 0xC9D3E6))
                 }
-                Text(player.name).font(.title3.weight(.bold)).foregroundStyle(Theme.textPrimary)
-                Text([player.age.map { "\($0)세" }, player.nationality.map { "\(Flags.emoji(for: $0)) \($0)" }]
-                        .compactMap { $0 }.joined(separator: " · "))
-                    .font(.footnote).foregroundStyle(Theme.textSecondary)
+                HStack(spacing: 6) {
+                    FlagImage(player.flagURL)
+                    Text(player.nationality ?? "-").font(.footnote).foregroundStyle(Color(hex: 0xC9D3E6))
+                }
             }
             Spacer(minLength: 0)
-            VStack(spacing: 2) {
-                RatingRing(player.stats?.rating, size: 58)
-                Text("시즌 평점").font(.system(size: 9)).foregroundStyle(Theme.textSecondary)
+        }
+        .padding(12)
+        .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color(hex: 0x2B4A86), lineWidth: 1))
+    }
+
+    // MARK: 개요
+
+    @ViewBuilder
+    private var overview: some View {
+        let metrics = PlayerMetrics.radar(for: player, teamGames: model.teamGames)
+        let strengths = PlayerMetrics.strengths(for: player, teamGames: model.teamGames)
+        if !strengths.isEmpty {
+            FMPanel("강점") {
+                HStack(spacing: 8) {
+                    ForEach(strengths, id: \.self) { item in
+                        Text(item).font(.footnote.weight(.bold)).foregroundStyle(Color.black.opacity(0.85))
+                            .padding(.horizontal, 10).padding(.vertical, 4)
+                            .background(Theme.gold, in: Capsule())
+                    }
+                    Spacer()
+                }
             }
         }
-        .padding(16)
-        .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        if metrics.isEmpty {
+            FMPanel("시즌 지표") {
+                Text("출전 기록이 없어 지표를 만들 수 없어요.").font(.footnote).foregroundStyle(Theme.textSecondary)
+            }
+        } else {
+            FMPanel("시즌 지표 (출전당)") {
+                VStack(spacing: 10) {
+                    RadarChart(labels: metrics.map(\.label), values: metrics.map(\.value)).frame(maxWidth: 260)
+                    VStack(spacing: 8) {
+                        ForEach(metrics, id: \.label) { metric in
+                            AttributeBar(label: metric.label, value: metric.value, detail: "\(Int((metric.value * 100).rounded()))")
+                        }
+                    }
+                    Text("골·도움 등 실제 기록을 출전 1회당으로 환산한 값입니다. 평점이 아닙니다.")
+                        .font(.caption2).foregroundStyle(Theme.textSecondary)
+                }
+            }
+        }
+    }
+
+    // MARK: 기록
+
+    private var rows: [(String, Int)] {
+        guard let s = stats else { return [] }
+        if player.position == .goalkeeper {
+            return [("출전", s.appearances), ("교체 투입", s.subIns), ("선방", s.saves), ("실점", s.conceded),
+                    ("피유효슈팅", s.shotsFaced), ("경고", s.yellow), ("퇴장", s.red), ("파울", s.foulsCommitted)]
+        }
+        return [("출전", s.appearances), ("교체 투입", s.subIns), ("골", s.goals), ("도움", s.assists), ("슈팅", s.shots),
+                ("유효슈팅", s.shotsOnTarget), ("파울 획득", s.foulsSuffered), ("파울", s.foulsCommitted),
+                ("오프사이드", s.offsides), ("경고", s.yellow), ("퇴장", s.red), ("자책골", s.ownGoals)]
+    }
+
+    @ViewBuilder
+    private var records: some View {
+        if rows.isEmpty {
+            FMPanel("시즌 기록") { Text("시즌 기록이 없어요.").font(.footnote).foregroundStyle(Theme.textSecondary) }
+        } else {
+            FMPanel("시즌 기록") {
+                VStack(spacing: 0) {
+                    ForEach(rows, id: \.0) { row in
+                        HStack {
+                            Text(row.0).font(.footnote).foregroundStyle(Theme.textSecondary)
+                            Spacer()
+                            Text("\(row.1)").font(.subheadline.weight(.heavy)).foregroundStyle(Theme.textPrimary)
+                            Text(perGame(row.1)).font(.caption2).foregroundStyle(Theme.textSecondary).frame(width: 64, alignment: .trailing)
+                        }
+                        .padding(.vertical, 6)
+                        Divider().overlay(Theme.line.opacity(0.5))
+                    }
+                }
+            }
+        }
+    }
+
+    private func perGame(_ value: Int) -> String {
+        guard let apps = stats?.appearances, apps > 0 else { return "" }
+        return String(format: "%.2f/경기", Double(value) / Double(apps))
+    }
+
+    // MARK: 정보
+
+    private var info: some View {
+        FMPanel("선수 정보") {
+            VStack(spacing: 0) {
+                infoRow("국적", player.nationality)
+                infoRow("포지션", player.position.title)
+                infoRow("나이", player.age.map { "\($0)세" })
+                infoRow("생년월일", player.birthDate.map { Fmt.birthday($0) })
+                infoRow("키", player.heightCM.map { "\($0) cm" })
+                infoRow("몸무게", player.weightKG.map { "\($0) kg" })
+                infoRow("출생지", player.birthPlace)
+                infoRow("등번호", player.number.map(String.init))
+                Text("사진·평점·패스 지표는 데이터 출처(\(model.services.sourceName))가 제공하지 않아 표시하지 않습니다.")
+                    .font(.caption2).foregroundStyle(Theme.textSecondary).padding(.top, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func infoRow(_ label: String, _ value: String?) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(label).font(.footnote).foregroundStyle(Theme.textSecondary)
+                Spacer()
+                Text(value ?? "-").font(.footnote.weight(.semibold)).foregroundStyle(Theme.textPrimary)
+            }
+            .padding(.vertical, 7)
+            Divider().overlay(Theme.line.opacity(0.5))
+        }
     }
 }

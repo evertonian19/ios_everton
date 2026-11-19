@@ -25,7 +25,7 @@ struct DataCheckView: View {
                             .padding(.vertical, 2)
                         }
                     } footer: {
-                        Text("확인 시각 \(Fmt.day(report.checkedAt)) \(Fmt.time(report.checkedAt)) · 출처 API-Football")
+                        Text("확인 시각 \(Fmt.day(report.checkedAt)) \(Fmt.time(report.checkedAt)) · 출처 \(report.source.isEmpty ? model.services.sourceName : report.source)")
                     }
                 } else {
                     HStack { ProgressView(); Text("점검 중…").padding(.leading, 8) }

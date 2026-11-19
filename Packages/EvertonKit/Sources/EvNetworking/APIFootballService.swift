@@ -51,9 +51,11 @@ public struct APIFootballService: FootballService {
 
     // MARK: - FootballService
 
+    public var homeTeamID: Int { EvertonInfo.apiFootballTeamID }
+
     public func matches() async throws -> [Match] {
         let result = try await fetch("fixtures",
-                                     ["team": String(EvertonInfo.teamID), "season": String(EvertonInfo.season)],
+                                     ["team": String(EvertonInfo.apiFootballTeamID), "season": String(EvertonInfo.season)],
                                      ttl: 600, as: [FixtureDTO].self)
         return result.response.compactMap(Mapping.match).sorted { $0.kickoff < $1.kickoff }
     }
@@ -88,7 +90,7 @@ public struct APIFootballService: FootballService {
 
     /// 시즌·일정·스쿼드가 기대와 맞는지 캐시 없이 새로 확인한다.
     public func diagnostics() async -> DataReport {
-        var report = DataReport()
+        var report = DataReport(source: "API-Football", unavailable: ["구단 창단연도·수용 인원은 구단 정보에서 제공될 때만 표시"])
         do {
             let leagues = try await fetch("leagues",
                                           ["id": String(EvertonInfo.leagueID), "season": String(EvertonInfo.season)],

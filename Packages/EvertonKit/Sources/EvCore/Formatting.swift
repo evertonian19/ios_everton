@@ -22,7 +22,15 @@ public enum Fmt {
         return f
     }()
 
+    private static let shortDayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "M/d"
+        return f
+    }()
+
     public static func day(_ date: Date) -> String { dayFormatter.string(from: date) }
+    public static func shortDay(_ date: Date) -> String { shortDayFormatter.string(from: date) }
     public static func time(_ date: Date) -> String { timeFormatter.string(from: date) }
     public static func month(_ date: Date) -> String { monthFormatter.string(from: date) }
 

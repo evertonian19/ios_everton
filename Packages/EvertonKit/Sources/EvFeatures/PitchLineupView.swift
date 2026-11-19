@@ -2,7 +2,7 @@ import SwiftUI
 import EvCore
 import EvDesign
 
-/// API 의 grid("행:열", 1행 = 골키퍼)를 이용해 선수들을 피치 위에 배치한다.
+/// grid("행:열", 1행 = 골키퍼)를 이용해 선수들을 피치 위에 배치한다. ESPN 은 포메이션 슬롯으로 계산해 준다.
 struct PitchLineupView: View {
     let lineup: TeamLineup
 
@@ -41,8 +41,8 @@ struct PitchLineupView: View {
             }
         }
         .aspectRatio(0.74, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.line, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Theme.line, lineWidth: 1))
     }
 }
 
@@ -51,18 +51,12 @@ private struct PitchPlayerView: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            ZStack(alignment: .topTrailing) {
-                PlayerPhoto(url: player.photoURL, name: player.name, size: 42)
-                if let rating = player.rating {
-                    Text(Fmt.rating(rating))
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.black.opacity(0.85))
-                        .padding(.horizontal, 4).padding(.vertical, 1)
-                        .background(Theme.ratingColor(rating), in: Capsule())
-                        .offset(x: 8, y: -4)
-                }
-            }
-            Text("\(player.number.map { "\($0) " } ?? "")\(player.shortName)")
+            Text(player.number.map(String.init) ?? "")
+                .font(.system(size: 13, weight: .heavy))
+                .foregroundStyle(Color(hex: 0x0B1220))
+                .frame(width: 28, height: 28)
+                .background(.white, in: Circle())
+            Text(player.shortName)
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 5).padding(.vertical, 1)

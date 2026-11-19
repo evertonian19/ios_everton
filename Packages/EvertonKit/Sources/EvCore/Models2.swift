@@ -98,10 +98,19 @@ public struct DataReport: Hashable, Codable, Sendable {
     public var missingPhotos: Int
     public var nextMatchDate: Date?
     public var errors: [String]
+    /// 데이터 출처 이름과 출처가 표기한 시즌 이름.
+    public var source: String
+    public var seasonName: String?
+    /// 출처가 제공하지 않아 표시하지 못하는 항목.
+    public var unavailable: [String]
 
     public init(checkedAt: Date = Date(), expectedSeason: Int = EvertonInfo.season, seasonFound: Bool = false,
                 seasonStart: String? = nil, seasonEnd: String? = nil, fixtureCount: Int = 0, squadCount: Int = 0,
-                missingNumbers: Int = 0, missingPhotos: Int = 0, nextMatchDate: Date? = nil, errors: [String] = []) {
+                missingNumbers: Int = 0, missingPhotos: Int = 0, nextMatchDate: Date? = nil, errors: [String] = [],
+                source: String = "", seasonName: String? = nil, unavailable: [String] = []) {
+        self.source = source
+        self.seasonName = seasonName
+        self.unavailable = unavailable
         self.checkedAt = checkedAt
         self.expectedSeason = expectedSeason
         self.seasonFound = seasonFound
@@ -129,9 +138,10 @@ public struct DataReport: Hashable, Codable, Sendable {
         let label = "\(expectedSeason)-\(String(expectedSeason + 1).suffix(2))"
         if seasonFound {
             let years = [seasonStart, seasonEnd].compactMap { $0?.prefix(4) }.joined(separator: " ~ ")
-            list.append(Check(title: "\(label) 시즌", detail: years.isEmpty ? "API 에서 확인됨" : "API 시즌 기간 \(years)", level: .ok))
+            let detail = seasonName.map { "출처 시즌 표기: \($0)" } ?? (years.isEmpty ? "출처에서 확인됨" : "시즌 기간 \(years)")
+            list.append(Check(title: "\(label) 시즌", detail: detail, level: .ok))
         } else {
-            list.append(Check(title: "\(label) 시즌", detail: "API 에서 찾지 못했습니다. 무료 플랜의 시즌 제한이거나 아직 등록되지 않았을 수 있습니다.", level: .problem))
+            list.append(Check(title: "\(label) 시즌", detail: "출처에서 해당 시즌을 찾지 못했습니다.", level: .problem))
         }
         list.append(Check(title: "경기 일정", detail: "\(fixtureCount)경기 (정규 시즌 38경기 + 컵대회)",
                           level: fixtureCount >= 38 ? .ok : (fixtureCount == 0 ? .problem : .warning)))
@@ -145,6 +155,9 @@ public struct DataReport: Hashable, Codable, Sendable {
         }
         if let nextMatchDate {
             list.append(Check(title: "다음 경기", detail: "\(Fmt.day(nextMatchDate)) \(Fmt.time(nextMatchDate))", level: .ok))
+        }
+        if !unavailable.isEmpty {
+            list.append(Check(title: "제공되지 않는 항목", detail: unavailable.joined(separator: " · ") + " (출처 한계, 임의 값으로 채우지 않음)", level: .warning))
         }
         for error in errors { list.append(Check(title: "오류", detail: error, level: .problem)) }
         return list

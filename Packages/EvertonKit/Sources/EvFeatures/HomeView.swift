@@ -2,67 +2,33 @@ import SwiftUI
 import EvCore
 import EvDesign
 
+/// 클럽 개요: 다음 경기, 리그 순위, 최근 경기, 공격 포인트 TOP, 뉴스.
 struct HomeView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openURL) private var openURL
     @State private var showCheck = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    if model.services.isSample { SampleBanner() }
-
+                VStack(spacing: 10) {
                     LoadStateView(state: model.matches, retry: { await model.loadMatches() }) { matches in
-                        VStack(spacing: 20) {
+                        VStack(spacing: 10) {
                             if let next = matches.nextMatch() {
-                                NavigationLink(value: next) { NextMatchHero(match: next) }.buttonStyle(.plain)
+                                NavigationLink(value: next) { NextMatchPanel(match: next) }.buttonStyle(.plain)
                             }
-                            FormStrip(matches: matches)
-                            if let last = matches.recentResults(1).last {
-                                VStack(spacing: 8) {
-                                    SectionTitle("지난 경기")
-                                    NavigationLink(value: last) { LastMatchCard(match: last) }.buttonStyle(.plain)
-                                }
-                            }
+                            standingPanel(matches)
+                            recentPanel(matches)
                         }
                     }
-
-                    if let players = model.squad.value {
-                        let top = PlayerMetrics.topRated(players)
-                        if !top.isEmpty {
-                            VStack(spacing: 8) {
-                                SectionTitle("이번 시즌 평점 TOP")
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 12) {
-                                        ForEach(top) { player in
-                                            NavigationLink(value: player) { TopPlayerTile(player: player) }.buttonStyle(.plain)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if let matches = model.matches.value {
-                        let upcoming = matches.filter { $0.phase == .upcoming }.prefix(4)
-                        if !upcoming.isEmpty {
-                            VStack(spacing: 8) {
-                                SectionTitle("다음 일정")
-                                VStack(spacing: 0) {
-                                    ForEach(Array(upcoming)) { match in
-                                        NavigationLink(value: match) { MatchRow(match: match) }.buttonStyle(.plain)
-                                        if match.id != upcoming.last?.id { Divider().overlay(Theme.line.opacity(0.5)) }
-                                    }
-                                }
-                                .evCard()
-                            }
-                        }
-                    }
+                    topPanel
+                    newsPanel
+                    SourceFooter()
                 }
-                .padding(16)
+                .padding(10)
             }
             .background(Theme.background)
-            .navigationTitle("EVERTON")
+            .navigationTitle("Everton")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await model.loadAll() }
             .toolbar {
@@ -76,119 +42,149 @@ struct HomeView: View {
             .navigationDestination(for: Player.self) { PlayerDetailView(player: $0) }
         }
     }
+
+    @ViewBuilder
+    private func standingPanel(_ matches: [Match]) -> some View {
+        if let row = model.standings.value?.first(where: { EvertonInfo.isEverton($0.club.id) }) {
+            FMPanel("리그 순위") {
+                VStack(spacing: 10) {
+                    HStack {
+                        stat("순위", "\(row.rank)위")
+                        stat("승점", "\(row.points)")
+                        stat("승-무-패", "\(row.won)-\(row.drawn)-\(row.lost)")
+                        stat("득실", row.goalDifference > 0 ? "+\(row.goalDifference)" : "\(row.goalDifference)")
+                    }
+                    Divider().overlay(Theme.line)
+                    HStack(spacing: 4) {
+                        ForEach(Array(matches.recentResults(5).enumerated()), id: \.offset) { _, match in
+                            FormBadge(match.result())
+                        }
+                        Spacer()
+                        Text("최근 5경기").font(.caption2).foregroundStyle(Theme.textSecondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func stat(_ label: String, _ value: String) -> some View {
+        VStack(spacing: 3) {
+            Text(label).font(.caption2).foregroundStyle(Theme.textSecondary)
+            Text(value).font(.headline.weight(.heavy)).foregroundStyle(Theme.textPrimary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func recentPanel(_ matches: [Match]) -> some View {
+        let recent = matches.recentResults(5).reversed()
+        if !recent.isEmpty {
+            FMPanel("최근 경기") {
+                VStack(spacing: 0) {
+                    ForEach(Array(recent)) { match in
+                        NavigationLink(value: match) { MatchRow(match: match) }.buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var topPanel: some View {
+        if let players = model.squad.value {
+            let top = PlayerMetrics.topContributors(players, limit: 5)
+            if !top.isEmpty {
+                FMPanel("공격 포인트 TOP") {
+                    VStack(spacing: 0) {
+                        ForEach(top) { player in
+                            NavigationLink(value: player) {
+                                HStack(spacing: 8) {
+                                    PositionTag(player.position)
+                                    Text(player.shortName).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.textPrimary)
+                                    Spacer()
+                                    Text("\(player.stats?.goals ?? 0)골 \(player.stats?.assists ?? 0)도움")
+                                        .font(.caption).foregroundStyle(Theme.textSecondary)
+                                    Text("\(player.stats?.contribution ?? 0)").font(.headline.weight(.heavy))
+                                        .foregroundStyle(Theme.attributeColor(Double(player.stats?.contribution ?? 0) / 8))
+                                        .frame(width: 26)
+                                }
+                                .padding(.vertical, 6)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var newsPanel: some View {
+        if let items = model.news.value, !items.isEmpty {
+            FMPanel("최근 뉴스") {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(items.prefix(3)) { item in
+                        Button { if let url = item.link { openURL(url) } } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title).font(.footnote.weight(.semibold)).foregroundStyle(Theme.textPrimary)
+                                    .multilineTextAlignment(.leading)
+                                if let date = item.date { Text(Fmt.day(date)).font(.caption2).foregroundStyle(Theme.textSecondary) }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
 }
 
-private struct NextMatchHero: View {
+private struct NextMatchPanel: View {
     let match: Match
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
             HStack {
-                Text(match.competition.uppercased()).font(.caption2.weight(.heavy)).tracking(1.2)
+                Text("다음 경기 · \(match.competition)").font(.caption.weight(.heavy)).foregroundStyle(Color(hex: 0xB9C4D6))
                 Spacer()
-                Text(match.isHome() ? "HOME" : "AWAY")
-                    .font(.caption2.weight(.heavy))
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(match.isHome() ? Theme.gold : Theme.line, in: Capsule())
-                    .foregroundStyle(match.isHome() ? .black : Theme.textPrimary)
+                Text(match.isHome() ? "홈" : "원정").font(.caption2.weight(.heavy))
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(match.isHome() ? Theme.gold : Theme.surfaceHigh, in: RoundedRectangle(cornerRadius: 3))
+                    .foregroundStyle(match.isHome() ? Color.black : Theme.textPrimary)
             }
-            .foregroundStyle(Theme.textSecondary)
-
             HStack {
-                VStack(spacing: 6) {
-                    ClubLogo(url: match.home.logoURL, size: 64).shadow(color: Theme.blue.opacity(0.7), radius: 14)
-                    Text(match.home.name).font(.footnote.weight(.semibold)).multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
+                team(match.home)
                 VStack(spacing: 4) {
                     if match.phase == .live {
-                        Text(match.scoreText).font(.system(size: 34, weight: .heavy, design: .rounded))
-                        Text("LIVE \(match.elapsed.map { "\($0)'" } ?? "")")
-                            .font(.caption.weight(.heavy)).foregroundStyle(Theme.loss)
+                        Text(match.scoreText).font(.system(size: 28, weight: .heavy, design: .rounded))
+                        Text("LIVE").font(.caption.weight(.heavy)).foregroundStyle(Theme.loss)
                     } else {
-                        Text("VS").font(.system(size: 26, weight: .black, design: .rounded)).foregroundStyle(Theme.gold)
+                        Text("VS").font(.title3.weight(.black)).foregroundStyle(Color(hex: 0x7FA6E8))
                         TimelineView(.periodic(from: .now, by: 1)) { context in
                             Text(Fmt.countdown(to: match.kickoff, from: context.date) ?? "곧 시작")
-                                .font(.system(.footnote, design: .monospaced).weight(.semibold))
-                                .foregroundStyle(Theme.textPrimary)
+                                .font(.system(.callout, design: .monospaced).weight(.bold))
+                                .foregroundStyle(Theme.gold)
                                 .contentTransition(.numericText())
                         }
                     }
                 }
-                .frame(width: 112)
-                VStack(spacing: 6) {
-                    ClubLogo(url: match.away.logoURL, size: 64)
-                    Text(match.away.name).font(.footnote.weight(.semibold)).multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
+                .frame(width: 110)
+                team(match.away)
             }
-            .foregroundStyle(Theme.textPrimary)
-
             Text("\(Fmt.day(match.kickoff)) \(Fmt.time(match.kickoff))\(match.venue.map { " · \($0)" } ?? "")")
-                .font(.caption).foregroundStyle(Theme.textSecondary)
+                .font(.caption).foregroundStyle(Color(hex: 0xC9D3E6))
         }
-        .padding(16)
-        .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Theme.blue.opacity(0.45), lineWidth: 1))
-    }
-}
-
-private struct FormStrip: View {
-    let matches: [Match]
-
-    var body: some View {
-        let recent = matches.recentResults(5)
-        if !recent.isEmpty {
-            VStack(spacing: 8) {
-                SectionTitle("최근 폼")
-                HStack(spacing: 8) {
-                    ForEach(recent) { match in
-                        VStack(spacing: 4) {
-                            FormBadge(match.result())
-                            ClubLogo(url: match.opponent().logoURL, size: 22)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-                .evCard()
-            }
-        }
-    }
-}
-
-private struct LastMatchCard: View {
-    let match: Match
-
-    var body: some View {
-        HStack {
-            ClubLogo(url: match.home.logoURL, size: 38)
-            Text(match.home.name).font(.footnote.weight(.semibold)).lineLimit(1)
-            Spacer()
-            Text(match.scoreText).font(.system(size: 22, weight: .heavy, design: .rounded))
-            Spacer()
-            Text(match.away.name).font(.footnote.weight(.semibold)).lineLimit(1)
-            ClubLogo(url: match.away.logoURL, size: 38)
-        }
+        .padding(12)
+        .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color(hex: 0x2B4A86), lineWidth: 1))
         .foregroundStyle(Theme.textPrimary)
-        .evCard()
     }
-}
 
-private struct TopPlayerTile: View {
-    let player: Player
-
-    var body: some View {
+    private func team(_ club: Club) -> some View {
         VStack(spacing: 6) {
-            ZStack(alignment: .bottomTrailing) {
-                PlayerPhoto(url: player.photoURL, name: player.name, size: 70)
-                RatingRing(player.stats?.rating, size: 30)
-                    .background(Theme.background, in: Circle())
-            }
-            Text(player.shortName).font(.footnote.weight(.semibold)).foregroundStyle(Theme.textPrimary).lineLimit(1)
-            PositionTag(player.position)
+            ClubLogo(url: club.logoURL, size: 52)
+            Text(club.display).font(.footnote.weight(.bold)).multilineTextAlignment(.center).lineLimit(2)
         }
-        .frame(width: 92)
-        .padding(.vertical, 10)
-        .evCard()
+        .frame(maxWidth: .infinity)
     }
 }

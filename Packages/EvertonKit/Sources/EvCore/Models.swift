@@ -1,22 +1,37 @@
 import Foundation
 
 public enum EvertonInfo {
-    public static let teamID = 45
+    /// ESPN 의 에버턴 ID. 앱의 기본 데이터 출처.
+    public static let teamID = 368
+    /// API-Football 의 에버턴 ID (키를 넣었을 때만 사용).
+    public static let apiFootballTeamID = 45
     public static let leagueID = 39
     public static let season = 2026
     public static let teamName = "Everton"
+
+    /// 출처에 관계없이 에버턴인지 확인한다.
+    public static func isEverton(_ id: Int) -> Bool { id == teamID || id == apiFootballTeamID }
 }
 
 public struct Club: Hashable, Codable, Sendable, Identifiable {
     public let id: Int
     public let name: String
     public let logoURL: URL?
+    /// 표에서 쓰는 짧은 이름 ("Brighton & Hove Albion" -> "Brighton").
+    public let shortName: String?
+    /// 3글자 약어 ("EVE").
+    public let code: String?
 
-    public init(id: Int, name: String, logoURL: URL? = nil) {
+    public init(id: Int, name: String, logoURL: URL? = nil, shortName: String? = nil, code: String? = nil) {
         self.id = id
         self.name = name
         self.logoURL = logoURL
+        self.shortName = shortName
+        self.code = code
     }
+
+    public var display: String { shortName ?? name }
+    public var abbreviation: String { code ?? String(name.prefix(3)).uppercased() }
 }
 
 public enum MatchPhase: String, Codable, Sendable {
@@ -66,13 +81,16 @@ public struct Match: Hashable, Codable, Sendable, Identifiable {
         self.elapsed = elapsed
     }
 
-    public func isHome(_ teamID: Int = EvertonInfo.teamID) -> Bool { home.id == teamID }
+    /// teamID 를 주지 않으면 에버턴(출처와 무관하게) 기준.
+    public func isHome(_ teamID: Int? = nil) -> Bool {
+        teamID.map { home.id == $0 } ?? EvertonInfo.isEverton(home.id)
+    }
 
-    public func opponent(of teamID: Int = EvertonInfo.teamID) -> Club {
+    public func opponent(of teamID: Int? = nil) -> Club {
         isHome(teamID) ? away : home
     }
 
-    public func result(for teamID: Int = EvertonInfo.teamID) -> MatchResult? {
+    public func result(for teamID: Int? = nil) -> MatchResult? {
         guard phase == .finished, let h = homeGoals, let a = awayGoals else { return nil }
         let mine = isHome(teamID) ? h : a
         let theirs = isHome(teamID) ? a : h
@@ -118,45 +136,61 @@ public enum Position: String, Codable, CaseIterable, Sendable {
     }
 }
 
+/// 시즌 누적 기록. 출처(ESPN)가 주지 않는 항목은 nil 이며, 임의의 값으로 채우지 않는다.
 public struct PlayerStats: Hashable, Codable, Sendable {
     public var appearances: Int
-    public var minutes: Int
-    public var rating: Double?
+    public var subIns: Int
     public var goals: Int
     public var assists: Int
     public var shots: Int
     public var shotsOnTarget: Int
-    public var passes: Int
-    public var keyPasses: Int
-    public var passAccuracy: Int
-    public var tackles: Int
-    public var dribbles: Int
+    public var foulsCommitted: Int
+    public var foulsSuffered: Int
+    public var offsides: Int
     public var yellow: Int
     public var red: Int
+    public var ownGoals: Int
     public var saves: Int
     public var conceded: Int
+    public var shotsFaced: Int
+    // API-Football 처럼 더 자세한 출처에서만 채워지는 값
+    public var minutes: Int?
+    public var rating: Double?
+    public var passAccuracy: Int?
+    public var keyPasses: Int?
+    public var tackles: Int?
+    public var dribbles: Int?
 
-    public init(appearances: Int = 0, minutes: Int = 0, rating: Double? = nil, goals: Int = 0,
-                assists: Int = 0, shots: Int = 0, shotsOnTarget: Int = 0, passes: Int = 0,
-                keyPasses: Int = 0, passAccuracy: Int = 0, tackles: Int = 0, dribbles: Int = 0,
-                yellow: Int = 0, red: Int = 0, saves: Int = 0, conceded: Int = 0) {
+    public init(appearances: Int = 0, subIns: Int = 0, goals: Int = 0, assists: Int = 0, shots: Int = 0,
+                shotsOnTarget: Int = 0, foulsCommitted: Int = 0, foulsSuffered: Int = 0, offsides: Int = 0,
+                yellow: Int = 0, red: Int = 0, ownGoals: Int = 0, saves: Int = 0, conceded: Int = 0,
+                shotsFaced: Int = 0, minutes: Int? = nil, rating: Double? = nil, passAccuracy: Int? = nil,
+                keyPasses: Int? = nil, tackles: Int? = nil, dribbles: Int? = nil) {
         self.appearances = appearances
-        self.minutes = minutes
-        self.rating = rating
+        self.subIns = subIns
         self.goals = goals
         self.assists = assists
         self.shots = shots
         self.shotsOnTarget = shotsOnTarget
-        self.passes = passes
-        self.keyPasses = keyPasses
-        self.passAccuracy = passAccuracy
-        self.tackles = tackles
-        self.dribbles = dribbles
+        self.foulsCommitted = foulsCommitted
+        self.foulsSuffered = foulsSuffered
+        self.offsides = offsides
         self.yellow = yellow
         self.red = red
+        self.ownGoals = ownGoals
         self.saves = saves
         self.conceded = conceded
+        self.shotsFaced = shotsFaced
+        self.minutes = minutes
+        self.rating = rating
+        self.passAccuracy = passAccuracy
+        self.keyPasses = keyPasses
+        self.tackles = tackles
+        self.dribbles = dribbles
     }
+
+    /// 골 + 도움.
+    public var contribution: Int { goals + assists }
 }
 
 public struct Player: Hashable, Codable, Sendable, Identifiable {
@@ -172,10 +206,13 @@ public struct Player: Hashable, Codable, Sendable, Identifiable {
     public var weightKG: Int?
     public var birthDate: Date?
     public var birthPlace: String?
+    public var flagURL: URL?
 
     public init(id: Int, name: String, number: Int?, position: Position, age: Int?,
                 nationality: String? = nil, photoURL: URL?, stats: PlayerStats? = nil,
-                heightCM: Int? = nil, weightKG: Int? = nil, birthDate: Date? = nil, birthPlace: String? = nil) {
+                heightCM: Int? = nil, weightKG: Int? = nil, birthDate: Date? = nil, birthPlace: String? = nil,
+                flagURL: URL? = nil) {
+        self.flagURL = flagURL
         self.heightCM = heightCM
         self.weightKG = weightKG
         self.birthDate = birthDate

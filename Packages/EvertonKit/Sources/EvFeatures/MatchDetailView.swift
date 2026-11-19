@@ -6,35 +6,31 @@ struct MatchDetailView: View {
     @Environment(AppModel.self) private var model
     let match: Match
 
-    private enum Tab: String, CaseIterable, Identifiable {
-        case stats = "통계", lineup = "라인업", ratings = "평점"
-        var id: String { rawValue }
-    }
+    private enum Tab: Hashable { case overview, stats, lineup, events }
 
     @State private var state: LoadState<MatchDetail> = .idle
-    @State private var tab: Tab = .stats
+    @State private var tab: Tab = .overview
+    @State private var homeSide = true
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: 10) {
                 header
-                Picker("보기", selection: $tab) {
-                    ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-
+                FMTabs([(Tab.overview, "개요"), (Tab.stats, "통계"), (Tab.lineup, "라인업"), (Tab.events, "이벤트")], selection: $tab)
                 LoadStateView(state: state, retry: { await load() }) { detail in
                     switch tab {
-                    case .stats: statsSection(detail)
-                    case .lineup: lineupSection(detail)
-                    case .ratings: ratingsSection(detail)
+                    case .overview: overview(detail)
+                    case .stats: statsPanel(detail)
+                    case .lineup: lineupPanel(detail)
+                    case .events: eventsPanel(detail)
                     }
                 }
+                SourceFooter()
             }
-            .padding(16)
+            .padding(10)
         }
         .background(Theme.background)
-        .navigationTitle("\(match.opponent().name)")
+        .navigationTitle(match.opponent().display)
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load() }
@@ -49,134 +45,89 @@ struct MatchDetailView: View {
     // MARK: 헤더
 
     private var header: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
+            Text("\(match.competition) · \(Fmt.day(match.kickoff)) \(Fmt.time(match.kickoff))\(match.venue.map { " · \($0)" } ?? "")")
+                .font(.caption).foregroundStyle(Color(hex: 0xC9D3E6))
             HStack {
-                VStack(spacing: 6) {
-                    ClubLogo(url: match.home.logoURL, size: 56)
-                    Text(match.home.name).font(.footnote.weight(.semibold)).multilineTextAlignment(.center)
+                club(match.home)
+                VStack(spacing: 2) {
+                    Text(match.phase == .upcoming ? "VS" : match.scoreText)
+                        .font(.system(size: 30, weight: .heavy, design: .rounded)).foregroundStyle(.white)
+                    Text(match.statusText).font(.caption2).foregroundStyle(Color(hex: 0x9FB4D8))
                 }
-                .frame(maxWidth: .infinity)
-                VStack(spacing: 4) {
-                    Text(match.phase == .upcoming ? Fmt.time(match.kickoff) : match.scoreText)
-                        .font(.system(size: 34, weight: .heavy, design: .rounded))
-                    Text(match.phase == .live ? "LIVE \(match.elapsed ?? 0)'" : match.statusText)
-                        .font(.caption2.weight(.heavy))
-                        .foregroundStyle(match.phase == .live ? Theme.loss : Theme.textSecondary)
-                }
-                .frame(width: 118)
-                VStack(spacing: 6) {
-                    ClubLogo(url: match.away.logoURL, size: 56)
-                    Text(match.away.name).font(.footnote.weight(.semibold)).multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
+                .frame(width: 110)
+                club(match.away)
             }
-            .foregroundStyle(Theme.textPrimary)
-            Text("\(Fmt.day(match.kickoff)) · \(match.round)\(match.venue.map { " · \($0)" } ?? "")")
-                .font(.caption).foregroundStyle(Theme.textSecondary).multilineTextAlignment(.center)
         }
-        .padding(16)
-        .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color(hex: 0x2B4A86), lineWidth: 1))
+    }
+
+    private func club(_ club: Club) -> some View {
+        VStack(spacing: 6) {
+            ClubLogo(url: club.logoURL, size: 52)
+            Text(club.display).font(.footnote.weight(.bold)).foregroundStyle(.white).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: 탭 내용
 
     @ViewBuilder
-    private func statsSection(_ detail: MatchDetail) -> some View {
-        VStack(spacing: 16) {
-            if !detail.events.isEmpty {
-                SectionTitle("주요 장면")
-                EventTimeline(events: detail.events, match: match)
-            }
-            if detail.stats.isEmpty {
-                emptyNote("아직 경기 통계가 없습니다.")
-            } else {
-                SectionTitle("경기 통계")
-                VStack(spacing: 14) {
-                    ForEach(detail.stats) { StatCompareRow($0) }
-                }
-                .evCard()
+    private func overview(_ detail: MatchDetail) -> some View {
+        if !detail.stats.isEmpty {
+            FMPanel("요약") {
+                VStack(spacing: 10) { ForEach(detail.stats.prefix(4)) { StatCompareRow($0) } }
             }
         }
+        eventsPanel(detail)
     }
 
     @ViewBuilder
-    private func lineupSection(_ detail: MatchDetail) -> some View {
-        if let lineup = evertonLineup(detail) {
-            VStack(spacing: 14) {
-                HStack {
-                    Text(lineup.club.name).font(.headline)
-                    Spacer()
-                    if let formation = lineup.formation {
-                        Text(formation).font(.subheadline.weight(.heavy)).foregroundStyle(Theme.gold)
-                    }
-                }
-                .foregroundStyle(Theme.textPrimary)
-                PitchLineupView(lineup: lineup)
-                if !lineup.substitutes.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        SectionTitle("교체 명단")
-                        ForEach(lineup.substitutes) { player in
-                            PlayerLine(player: player)
-                        }
-                    }
-                    .evCard()
-                }
-            }
+    private func statsPanel(_ detail: MatchDetail) -> some View {
+        if detail.stats.isEmpty {
+            FMPanel("경기 통계") { Text("통계가 아직 없어요.").font(.footnote).foregroundStyle(Theme.textSecondary) }
         } else {
-            emptyNote("라인업은 경기 직전에 공개됩니다.")
+            FMPanel("경기 통계") {
+                VStack(spacing: 12) { ForEach(detail.stats) { StatCompareRow($0) } }
+            }
         }
     }
 
     @ViewBuilder
-    private func ratingsSection(_ detail: MatchDetail) -> some View {
-        if let lineup = evertonLineup(detail) {
-            let rated = (lineup.starters + lineup.substitutes)
-                .filter { $0.rating != nil }
-                .sorted { ($0.rating ?? 0) > ($1.rating ?? 0) }
-            if rated.isEmpty {
-                emptyNote("평점은 경기 후에 집계됩니다.")
+    private func eventsPanel(_ detail: MatchDetail) -> some View {
+        let events = detail.events.filter(\.isKey)
+        FMPanel("주요 장면") {
+            if events.isEmpty {
+                Text("주요 장면이 없어요.").font(.footnote).foregroundStyle(Theme.textSecondary)
             } else {
+                EventTimeline(events: events, match: match)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func lineupPanel(_ detail: MatchDetail) -> some View {
+        let lineup = detail.lineups.first(where: { ($0.club.id == match.home.id) == homeSide }) ?? detail.lineups.first
+        if let lineup {
+            FMPanel("\(lineup.club.display) \(lineup.formation ?? "")") {
                 VStack(spacing: 10) {
-                    ForEach(Array(rated.enumerated()), id: \.element.id) { index, player in
-                        HStack(spacing: 10) {
-                            Text("\(index + 1)").font(.caption.weight(.heavy)).foregroundStyle(Theme.textSecondary).frame(width: 18)
-                            PlayerPhoto(url: player.photoURL, name: player.name, size: 36)
-                            Text(player.name).font(.subheadline).foregroundStyle(Theme.textPrimary)
-                            if index == 0 {
-                                Image(systemName: "crown.fill").foregroundStyle(Theme.gold).font(.caption)
-                            }
-                            Spacer()
-                            RatingRing(player.rating, size: 38)
+                    FMTabs([(true, "홈"), (false, "원정")], selection: $homeSide)
+                    PitchLineupView(lineup: lineup)
+                    if !lineup.substitutes.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("교체 명단").font(.caption.weight(.bold)).foregroundStyle(Theme.textSecondary)
+                            Text(lineup.substitutes.map { "\($0.number.map { "\($0) " } ?? "")\($0.shortName)" }.joined(separator: " · "))
+                                .font(.caption).foregroundStyle(Theme.textPrimary)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .evCard()
             }
         } else {
-            emptyNote("평점은 경기 후에 집계됩니다.")
-        }
-    }
-
-    private func evertonLineup(_ detail: MatchDetail) -> TeamLineup? {
-        detail.lineups.first(where: { $0.club.id == EvertonInfo.teamID }) ?? detail.lineups.first
-    }
-
-    private func emptyNote(_ text: String) -> some View {
-        Text(text).font(.footnote).foregroundStyle(Theme.textSecondary)
-            .frame(maxWidth: .infinity, minHeight: 120)
-    }
-}
-
-private struct PlayerLine: View {
-    let player: LineupPlayer
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Text(player.number.map(String.init) ?? "-")
-                .font(.caption.weight(.heavy)).foregroundStyle(Theme.gold).frame(width: 24)
-            Text(player.name).font(.subheadline).foregroundStyle(Theme.textPrimary)
-            Spacer()
-            if player.rating != nil { RatingRing(player.rating, size: 30) }
+            FMPanel("라인업") { Text("라인업이 아직 없어요.").font(.footnote).foregroundStyle(Theme.textSecondary) }
         }
     }
 }

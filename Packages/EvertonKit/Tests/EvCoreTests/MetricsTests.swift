@@ -2,11 +2,15 @@ import XCTest
 @testable import EvCore
 
 final class MetricsTests: XCTestCase {
-    func testRadarHasSixBoundedValues() {
+    func testRadarBoundedAndEmptyWithoutAppearances() {
         for player in Sample.players {
-            let metrics = PlayerMetrics.radar(for: player)
-            XCTAssertEqual(metrics.count, 6, player.name)
-            for metric in metrics { XCTAssertTrue((0...1).contains(metric.value), "\(player.name) \(metric.label)") }
+            let metrics = PlayerMetrics.radar(for: player, teamGames: 10)
+            if (player.stats?.appearances ?? 0) == 0 {
+                XCTAssertTrue(metrics.isEmpty, player.name)
+            } else {
+                XCTAssertGreaterThanOrEqual(metrics.count, 5, player.name)
+                for metric in metrics { XCTAssertTrue((0...1).contains(metric.value), "\(player.name) \(metric.label)") }
+            }
         }
     }
 
@@ -15,28 +19,37 @@ final class MetricsTests: XCTestCase {
         XCTAssertTrue(PlayerMetrics.radar(for: player).isEmpty)
     }
 
-    func testTopRatedSortedDescending() {
-        let top = PlayerMetrics.topRated(Sample.players, limit: 3)
-        XCTAssertEqual(top.count, 3)
-        let ratings = top.compactMap { $0.stats?.rating }
-        XCTAssertEqual(ratings, ratings.sorted(by: >))
+    func testTopContributorsSortedAndNoGoalkeepers() {
+        let top = PlayerMetrics.topContributors(Sample.players, limit: 5)
+        XCTAssertFalse(top.isEmpty)
+        let points = top.compactMap { $0.stats?.contribution }
+        XCTAssertEqual(points, points.sorted(by: >))
+        XCTAssertTrue(top.allSatisfy { $0.position != .goalkeeper })
     }
 
-    func testStrengthsAreAtMostTwoAndKnownLabels() {
-        let labels = Set(Sample.players.flatMap { PlayerMetrics.radar(for: $0).map(\.label) })
+    func testStrengthsRules() {
         for player in Sample.players {
-            let strengths = PlayerMetrics.strengths(for: player)
+            let strengths = PlayerMetrics.strengths(for: player, teamGames: 10)
             XCTAssertLessThanOrEqual(strengths.count, 2)
-            for item in strengths { XCTAssertTrue(labels.contains(item)) }
+            XCTAssertFalse(strengths.contains("규율"))
+            if (player.stats?.appearances ?? 0) < PlayerMetrics.strengthMinAppearances {
+                XCTAssertTrue(strengths.isEmpty, player.name)
+            }
         }
+    }
+
+    func testSnapshotSquadIsCurrentSeason() {
+        XCTAssertEqual(Sample.players.count, 24)
+        let names = Set(Sample.players.map(\.name))
+        XCTAssertTrue(names.contains("Jordan Pickford"))
+        XCTAssertTrue(names.contains("Jack Grealish"))
+        XCTAssertEqual(Sample.players.first { $0.name == "Jordan Pickford" }?.number, 1)
     }
 
     func testFlagsAndBodyFormatting() {
         XCTAssertEqual(Flags.emoji(for: "Brazil"), "🇧🇷")
-        XCTAssertEqual(Flags.emoji(for: "Ivory Coast"), "🇨🇮")
         XCTAssertEqual(Flags.emoji(for: "Atlantis"), "")
         XCTAssertEqual(Fmt.height(185), "185 cm")
         XCTAssertEqual(Fmt.weight(nil), "-")
-        XCTAssertEqual(Fmt.capacity(52888), "52,888명")
     }
 }

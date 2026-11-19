@@ -5,29 +5,16 @@ import EvDesign
 struct SquadView: View {
     @Environment(AppModel.self) private var model
 
-    private let columns = [GridItem(.adaptive(minimum: 104), spacing: 10)]
-
     var body: some View {
         NavigationStack {
             ScrollView {
-                LoadStateView(state: model.squad, retry: { await model.loadSquad() }) { players in
-                    VStack(spacing: 20) {
-                        ForEach(Position.allCases, id: \.self) { position in
-                            let group = players.filter { $0.position == position }
-                            if !group.isEmpty {
-                                VStack(spacing: 8) {
-                                    SectionTitle(position.title, trailing: "\(group.count)명")
-                                    LazyVGrid(columns: columns, spacing: 10) {
-                                        ForEach(group) { player in
-                                            NavigationLink(value: player) { PlayerCard(player) }.buttonStyle(.plain)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                VStack(spacing: 10) {
+                    LoadStateView(state: model.squad, retry: { await model.loadSquad() }) { players in
+                        FMPanel("1군 스쿼드 · \(players.count)명") { RosterTable(players: players) }
                     }
-                    .padding(16)
+                    SourceFooter()
                 }
+                .padding(10)
             }
             .background(Theme.background)
             .navigationTitle("스쿼드")

@@ -122,14 +122,13 @@ enum Mapping {
         let stat = dto.statistics.first(where: { $0.league?.id == EvertonInfo.leagueID }) ?? dto.statistics.first
         guard let s = stat else { return nil }
         return PlayerStats(
-            appearances: s.games?.appearences ?? 0, minutes: s.games?.minutes ?? 0, rating: s.games?.rating?.value,
-            goals: s.goals?.total ?? 0, assists: s.goals?.assists ?? 0,
+            appearances: s.games?.appearences ?? 0, goals: s.goals?.total ?? 0, assists: s.goals?.assists ?? 0,
             shots: s.shots?.total ?? 0, shotsOnTarget: s.shots?.on ?? 0,
-            passes: s.passes?.total ?? 0, keyPasses: s.passes?.key ?? 0,
-            passAccuracy: Int(s.passes?.accuracy?.value ?? 0),
-            tackles: s.tackles?.total ?? 0, dribbles: s.dribbles?.success ?? 0,
             yellow: s.cards?.yellow ?? 0, red: s.cards?.red ?? 0,
-            saves: s.goals?.saves ?? 0, conceded: s.goals?.conceded ?? 0)
+            saves: s.goals?.saves ?? 0, conceded: s.goals?.conceded ?? 0,
+            minutes: s.games?.minutes, rating: s.games?.rating?.value,
+            passAccuracy: s.passes?.accuracy?.value.map { Int($0) }, keyPasses: s.passes?.key,
+            tackles: s.tackles?.total, dribbles: s.dribbles?.success)
     }
 
     static func events(_ list: [EventDTO]) -> [MatchEvent] {

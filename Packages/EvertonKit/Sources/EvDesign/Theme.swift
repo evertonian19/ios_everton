@@ -1,4 +1,5 @@
 import SwiftUI
+import EvCore
 
 public extension Color {
     init(hex: UInt32, opacity: Double = 1) {
@@ -10,34 +11,54 @@ public extension Color {
     }
 }
 
+/// Football Manager 풍 팔레트: 어두운 슬레이트 바탕, 패널 헤더 바, 파란 포인트.
 public enum Theme {
-    public static let background = Color(hex: 0x0A1020)
-    public static let surface = Color(hex: 0x121B33)
-    public static let surfaceHigh = Color(hex: 0x1B2747)
-    public static let line = Color(hex: 0x2A3860)
-    public static let blue = Color(hex: 0x2F6BFF)
-    public static let deepBlue = Color(hex: 0x003399)
+    public static let background = Color(hex: 0x11151C)
+    public static let surface = Color(hex: 0x1A212B)
+    public static let surfaceHigh = Color(hex: 0x232C3A)
+    public static let panelHeader = Color(hex: 0x232C3A)
+    public static let line = Color(hex: 0x2C3646)
+    public static let blue = Color(hex: 0x3FA9F5)
+    public static let deepBlue = Color(hex: 0x17325F)
     public static let gold = Color(hex: 0xF5C451)
-    public static let win = Color(hex: 0x2ECC71)
-    public static let draw = Color(hex: 0x9AA4B8)
-    public static let loss = Color(hex: 0xE5484D)
-    public static let textPrimary = Color.white
-    public static let textSecondary = Color(hex: 0x8E9AB5)
+    public static let win = Color(hex: 0x2FA56B)
+    public static let draw = Color(hex: 0x7B879D)
+    public static let loss = Color(hex: 0xD5484B)
+    public static let textPrimary = Color(hex: 0xE6EAF2)
+    public static let textSecondary = Color(hex: 0x8793A6)
 
     public static let heroGradient = LinearGradient(
-        colors: [Color(hex: 0x14307A), Color(hex: 0x0B1B4D), Color(hex: 0x0A1020)],
-        startPoint: .topLeading, endPoint: .bottomTrailing)
+        colors: [Color(hex: 0x17325F), Color(hex: 0x101B33)], startPoint: .topLeading, endPoint: .bottomTrailing)
 
-    /// 평점 색상 등급 (FM 의 평점 색과 비슷하게).
-    public static func ratingColor(_ rating: Double?) -> Color {
-        guard let rating else { return draw }
-        switch rating {
-        case ..<6.0: return loss
-        case ..<6.7: return Color(hex: 0xF08A24)
-        case ..<7.3: return Color(hex: 0xC9D63A)
-        case ..<8.0: return win
-        case ..<9.0: return Color(hex: 0x27D3E6)
-        default: return gold
+    /// 포지션 배지 색 (FM 처럼 포지션 그룹마다 고정 색).
+    public static func positionColor(_ position: String) -> Color {
+        switch position {
+        case "GK": return Color(hex: 0xE9C547)
+        case "DF": return Color(hex: 0x4C9BEA)
+        case "MF": return Color(hex: 0x4CC38A)
+        default: return Color(hex: 0xEF6A63)
+        }
+    }
+
+    /// 0...1 로 정규화한 값을 FM 속성 숫자처럼 빨강→주황→노랑→초록→청록으로 칠한다.
+    public static func attributeColor(_ value: Double) -> Color {
+        switch value {
+        case ..<0.2: return Color(hex: 0xD5484B)
+        case ..<0.4: return Color(hex: 0xE8863A)
+        case ..<0.6: return Color(hex: 0xD9C23B)
+        case ..<0.8: return Color(hex: 0x5BC27A)
+        default: return Color(hex: 0x2FD3C0)
+        }
+    }
+
+    /// 순위표 왼쪽 막대 색.
+    public static func zoneColor(_ zone: StandingRow.Zone) -> Color {
+        switch zone {
+        case .champions: return Color(hex: 0x3FA9F5)
+        case .europa: return Color(hex: 0xF5A524)
+        case .conference: return Color(hex: 0x4CC38A)
+        case .relegation: return Color(hex: 0xE5484D)
+        case .none: return .clear
         }
     }
 }
