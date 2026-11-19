@@ -157,3 +157,47 @@ struct SeasonPlayerDTO: Decodable {
     let player: Person
     let statistics: [Stat]
 }
+
+struct EventDTO: Decodable {
+    struct Time: Decodable { let elapsed: Int?; let extra: Int? }
+    struct Person: Decodable { let id: Int?; let name: String? }
+    let time: Time
+    let team: TeamDTO
+    let player: Person?
+    let assist: Person?
+    let type: String?
+    let detail: String?
+}
+
+struct StandingsDTO: Decodable {
+    struct League: Decodable {
+        let standings: [[Row]]
+    }
+    struct Row: Decodable {
+        struct Record: Decodable {
+            struct Goals: Decodable { let `for`: Int?; let against: Int? }
+            let played: Int?
+            let win: Int?
+            let draw: Int?
+            let lose: Int?
+            let goals: Goals?
+        }
+        let rank: Int
+        let team: TeamDTO
+        let points: Int?
+        let form: String?
+        let description: String?
+        let all: Record?
+    }
+    let league: League
+}
+
+struct LeagueInfoDTO: Decodable {
+    struct Season: Decodable {
+        let year: Int
+        let start: String?
+        let end: String?
+        let current: Bool?
+    }
+    let seasons: [Season]
+}

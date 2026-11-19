@@ -246,11 +246,13 @@ public struct MatchDetail: Hashable, Codable, Sendable {
     public let match: Match
     public let stats: [StatLine]
     public let lineups: [TeamLineup]
+    public let events: [MatchEvent]
 
-    public init(match: Match, stats: [StatLine], lineups: [TeamLineup]) {
+    public init(match: Match, stats: [StatLine], lineups: [TeamLineup], events: [MatchEvent] = []) {
         self.match = match
         self.stats = stats
         self.lineups = lineups
+        self.events = events
     }
 }
 

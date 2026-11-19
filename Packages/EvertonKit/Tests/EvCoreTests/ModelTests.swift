@@ -42,4 +42,13 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(Fmt.countdown(to: now.addingTimeInterval(3_661), from: now), "01:01:01")
         XCTAssertEqual(Fmt.countdown(to: now.addingTimeInterval(90_061), from: now), "1일 01:01:01")
     }
+
+    func testDataReportChecks() {
+        var report = DataReport(seasonFound: true, seasonStart: "2026-08-22", seasonEnd: "2027-05-23",
+                                fixtureCount: 38, squadCount: 25, missingNumbers: 2)
+        XCTAssertTrue(report.checks.contains { $0.title.contains("2026-27") && $0.level == .ok })
+        XCTAssertTrue(report.checks.contains { $0.title == "등번호" && $0.level == .warning })
+        report.seasonFound = false
+        XCTAssertTrue(report.checks.contains { $0.title.contains("시즌") && $0.level == .problem })
+    }
 }

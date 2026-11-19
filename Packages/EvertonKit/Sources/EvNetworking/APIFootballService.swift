@@ -65,15 +65,54 @@ public struct APIFootballService: FootballService {
         async let statsRequest = fetch("fixtures/statistics", ["fixture": id], ttl: ttl, as: [StatisticsDTO].self)
         async let lineupRequest = fetch("fixtures/lineups", ["fixture": id], ttl: ttl, as: [LineupDTO].self)
         async let playersRequest = fetch("fixtures/players", ["fixture": id], ttl: ttl, as: [FixturePlayersDTO].self)
+        async let eventsRequest = fetch("fixtures/events", ["fixture": id], ttl: ttl, as: [EventDTO].self)
 
         let stats = (try? await statsRequest.response) ?? []
         let lineups = (try? await lineupRequest.response) ?? []
         let players = (try? await playersRequest.response) ?? []
+        let events = (try? await eventsRequest.response) ?? []
 
         return MatchDetail(
             match: match,
             stats: Mapping.statLines(stats, homeID: match.home.id),
-            lineups: Mapping.lineups(lineups, ratings: Mapping.ratings(players)))
+            lineups: Mapping.lineups(lineups, ratings: Mapping.ratings(players)),
+            events: Mapping.events(events).filter { $0.isKey })
+    }
+
+    public func standings() async throws -> [StandingRow] {
+        let result = try await fetch("standings",
+                                     ["league": String(EvertonInfo.leagueID), "season": String(EvertonInfo.season)],
+                                     ttl: 3_600, as: [StandingsDTO].self)
+        return Mapping.standings(result.response)
+    }
+
+    /// 시즌·일정·스쿼드가 기대와 맞는지 캐시 없이 새로 확인한다.
+    public func diagnostics() async -> DataReport {
+        var report = DataReport()
+        do {
+            let leagues = try await fetch("leagues",
+                                          ["id": String(EvertonInfo.leagueID), "season": String(EvertonInfo.season)],
+                                          ttl: 0, as: [LeagueInfoDTO].self)
+            if let season = leagues.response.first?.seasons.first(where: { $0.year == EvertonInfo.season }) {
+                report.seasonFound = true
+                report.seasonStart = season.start
+                report.seasonEnd = season.end
+            }
+        } catch { report.errors.append("시즌 조회 실패: \(error.localizedDescription)") }
+
+        do {
+            let matches = try await self.matches()
+            report.fixtureCount = matches.count
+            report.nextMatchDate = matches.nextMatch()?.kickoff
+        } catch { report.errors.append("일정 조회 실패: \(error.localizedDescription)") }
+
+        do {
+            let players = try await squad()
+            report.squadCount = players.count
+            report.missingNumbers = players.filter { $0.number == nil }.count
+            report.missingPhotos = players.filter { $0.photoURL == nil }.count
+        } catch { report.errors.append("스쿼드 조회 실패: \(error.localizedDescription)") }
+        return report
     }
 
     public func squad() async throws -> [Player] {

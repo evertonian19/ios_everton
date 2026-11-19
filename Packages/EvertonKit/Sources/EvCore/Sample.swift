@@ -84,6 +84,27 @@ public enum Sample {
         return MatchDetail(match: match, stats: stats, lineups: [lineup])
     }
 
+    public static func events(for match: Match) -> [MatchEvent] {
+        guard let h = match.homeGoals, let a = match.awayGoals else { return [] }
+        var list: [MatchEvent] = []
+        var id = 1
+        for i in 0..<h { list.append(MatchEvent(id: id, minute: 12 + i * 31, extra: nil, clubID: match.home.id, player: "샘플 선수", assist: nil, kind: .goal)); id += 1 }
+        for i in 0..<a { list.append(MatchEvent(id: id, minute: 27 + i * 33, extra: nil, clubID: match.away.id, player: "샘플 선수", assist: nil, kind: .goal)); id += 1 }
+        list.append(MatchEvent(id: id, minute: 58, extra: nil, clubID: match.home.id, player: "샘플 선수", assist: nil, kind: .yellow))
+        return list.sorted { $0.minute < $1.minute }
+    }
+
+    public static let standings: [StandingRow] = {
+        let names: [(Int, String)] = [(42, "Arsenal"), (50, "Manchester City"), (40, "Liverpool"), (33, "Manchester United"),
+                                      (34, "Newcastle"), (47, "Tottenham"), (45, "Everton"), (66, "Aston Villa"), (52, "Crystal Palace")]
+        return names.enumerated().map { index, entry in
+            StandingRow(rank: index + 1, club: Club(id: entry.0, name: entry.1, logoURL: logo(entry.0)),
+                        played: 12, won: 9 - index, drawn: 2, lost: index, goalsFor: 24 - index, goalsAgainst: 10 + index,
+                        points: 29 - index * 2, form: "WDWLW",
+                        note: index < 4 ? "Promotion - Champions League (League phase)" : (index > 7 ? "Relegation - Championship" : nil))
+        }
+    }()
+
     public static let news: [NewsItem] = [
         NewsItem(id: "s1", title: "Everton make strong start to the new season",
                  summary: "The Blues have picked up momentum after a solid run of results at home.",
@@ -99,9 +120,17 @@ public struct MockFootballService: FootballService {
     public func matches() async throws -> [Match] { Sample.matches }
     public func detail(of match: Match) async throws -> MatchDetail {
         let base = Sample.detail
-        return MatchDetail(match: match, stats: base.stats, lineups: base.lineups)
+        return MatchDetail(match: match, stats: base.stats, lineups: base.lineups, events: Sample.events(for: match))
     }
     public func squad() async throws -> [Player] { Sample.players }
+    public func standings() async throws -> [StandingRow] { Sample.standings }
+    public func diagnostics() async -> DataReport {
+        DataReport(seasonFound: true, seasonStart: "2026-08-15", seasonEnd: "2027-05-30",
+                   fixtureCount: Sample.matches.count, squadCount: Sample.players.count,
+                   missingNumbers: 0, missingPhotos: Sample.players.count,
+                   nextMatchDate: Sample.matches.nextMatch()?.kickoff,
+                   errors: ["샘플 데이터입니다. API 키를 설정하면 실제 점검 결과가 표시됩니다."])
+    }
 }
 
 public struct MockNewsService: NewsService {

@@ -4,6 +4,8 @@ public protocol FootballService: Sendable {
     func matches() async throws -> [Match]
     func detail(of match: Match) async throws -> MatchDetail
     func squad() async throws -> [Player]
+    func standings() async throws -> [StandingRow]
+    func diagnostics() async -> DataReport
 }
 
 public protocol NewsService: Sendable {

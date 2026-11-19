@@ -107,4 +107,37 @@ enum Mapping {
             yellow: s.cards?.yellow ?? 0, red: s.cards?.red ?? 0,
             saves: s.goals?.saves ?? 0, conceded: s.goals?.conceded ?? 0)
     }
+
+    static func events(_ list: [EventDTO]) -> [MatchEvent] {
+        list.enumerated().compactMap { index, dto in
+            guard let minute = dto.time.elapsed else { return nil }
+            let type = (dto.type ?? "").lowercased()
+            let detail = (dto.detail ?? "").lowercased()
+            let kind: MatchEventKind
+            switch type {
+            case "goal":
+                if detail.contains("own") { kind = .ownGoal }
+                else if detail.contains("missed") { kind = .missedPenalty }
+                else { kind = .goal }
+            case "card": kind = detail.contains("red") ? .red : .yellow
+            case "subst": kind = .substitution
+            case "var": kind = .var_
+            default: kind = .other
+            }
+            return MatchEvent(id: index, minute: minute, extra: dto.time.extra, clubID: dto.team.id,
+                              player: dto.player?.name ?? "", assist: dto.assist?.name, kind: kind)
+        }
+    }
+
+    static func standings(_ list: [StandingsDTO]) -> [StandingRow] {
+        guard let rows = list.first?.league.standings.first else { return [] }
+        return rows.map { row in
+            StandingRow(rank: row.rank, club: club(row.team),
+                        played: row.all?.played ?? 0, won: row.all?.win ?? 0, drawn: row.all?.draw ?? 0,
+                        lost: row.all?.lose ?? 0, goalsFor: row.all?.goals?.for ?? 0,
+                        goalsAgainst: row.all?.goals?.against ?? 0, points: row.points ?? 0,
+                        form: row.form ?? "", note: row.description)
+        }
+        .sorted { $0.rank < $1.rank }
+    }
 }

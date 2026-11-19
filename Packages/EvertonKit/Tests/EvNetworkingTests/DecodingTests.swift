@@ -66,4 +66,42 @@ final class DecodingTests: XCTestCase {
         XCTAssertNotNil(items[0].date)
         XCTAssertEqual(items[0].imageURL?.absoluteString, "https://example.com/a.jpg")
     }
+
+    func testEventsMapping() throws {
+        let json = """
+        {"response":[
+          {"time":{"elapsed":12,"extra":null},"team":{"id":45,"name":"Everton"},"player":{"id":1,"name":"A"},"assist":{"id":2,"name":"B"},"type":"Goal","detail":"Normal Goal"},
+          {"time":{"elapsed":45,"extra":2},"team":{"id":40,"name":"Liverpool"},"player":{"id":3,"name":"C"},"assist":{"id":null,"name":null},"type":"Card","detail":"Yellow Card"},
+          {"time":{"elapsed":60,"extra":null},"team":{"id":45,"name":"Everton"},"player":{"id":4,"name":"D"},"assist":{"id":5,"name":"E"},"type":"subst","detail":"Substitution 1"}
+        ]}
+        """.data(using: .utf8)!
+        let envelope = try JSONDecoder().decode(Envelope<[EventDTO]>.self, from: json)
+        let events = Mapping.events(envelope.response)
+        XCTAssertEqual(events.map(\.kind), [.goal, .yellow, .substitution])
+        XCTAssertEqual(events[1].minuteText, "45+2'")
+        XCTAssertEqual(events.filter { $0.isKey }.count, 2)
+    }
+
+    func testStandingsMappingAndZones() throws {
+        let json = """
+        {"response":[{"league":{"standings":[[
+          {"rank":2,"team":{"id":45,"name":"Everton","logo":null},"points":20,"form":"WWDLW","description":"Relegation - Championship",
+           "all":{"played":10,"win":6,"draw":2,"lose":2,"goals":{"for":15,"against":9}}},
+          {"rank":1,"team":{"id":42,"name":"Arsenal","logo":null},"points":25,"form":"WWWWW","description":"Promotion - Champions League (League phase)",
+           "all":{"played":10,"win":8,"draw":1,"lose":1,"goals":{"for":22,"against":6}}}
+        ]]}}]}
+        """.data(using: .utf8)!
+        let envelope = try JSONDecoder().decode(Envelope<[StandingsDTO]>.self, from: json)
+        let rows = Mapping.standings(envelope.response)
+        XCTAssertEqual(rows.map(\.rank), [1, 2])
+        XCTAssertEqual(rows[0].zone, .champions)
+        XCTAssertEqual(rows[1].zone, .relegation)
+        XCTAssertEqual(rows[0].goalDifference, 16)
+    }
+
+    func testLeagueSeasonLookup() throws {
+        let json = #"{"response":[{"seasons":[{"year":2025,"start":"2025-08-15","end":"2026-05-24","current":false},{"year":2026,"start":"2026-08-22","end":"2027-05-23","current":true}]}]}"#.data(using: .utf8)!
+        let envelope = try JSONDecoder().decode(Envelope<[LeagueInfoDTO]>.self, from: json)
+        XCTAssertEqual(envelope.response.first?.seasons.first(where: { $0.year == EvertonInfo.season })?.start, "2026-08-22")
+    }
 }
