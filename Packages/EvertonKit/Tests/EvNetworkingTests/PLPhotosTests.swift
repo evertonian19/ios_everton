@@ -44,4 +44,27 @@ final class PLPhotosTests: XCTestCase {
         XCTAssertNil(PLClubDirectory.clubID(for: ["Hull City"], in: [11: "Everton"]))
         XCTAssertNil(PLClubDirectory.clubID(for: ["Everton"], in: [11: "Everton", 99: "Everton FC"]))
     }
+
+    func testCandidatesAreHighResThenLowResAndSkipManual() {
+        let entries = PLSquadParser.parseSquad(html)
+        let players = [Player(id: 1, name: "Jordan Pickford", number: nil, position: .goalkeeper, age: nil, photoURL: nil),
+                       Player(id: 2, name: "Merlin Röhl", number: nil, position: .midfielder, age: nil, photoURL: nil)]
+        let out = PLPhotos.candidates(players, entries: entries, keep: [2])
+        XCTAssertEqual(Array(out.keys), [1])
+        XCTAssertEqual(out[1]?.map(\.url.lastPathComponent), ["p111234.png", "111234.png"])
+        XCTAssertEqual(out[1]?.first?.source, .premierleague)
+    }
+
+    func testPhotoSniffRejectsSmallAndNonImages() {
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data(repeating: 0x78, count: 9_000)
+        XCTAssertEqual(PhotoCache.sniff(png), "png")
+        XCTAssertEqual(PhotoCache.sniff(Data([0xFF, 0xD8, 0xFF]) + Data(repeating: 0x78, count: 9_000)), "jpg")
+        XCTAssertNil(PhotoCache.sniff(Data("<html>429</html>".utf8) + Data(repeating: 0x20, count: 9_000)))
+        XCTAssertNil(PhotoCache.sniff(Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data(repeating: 0x78, count: 100)))
+    }
+
+    func testSourceRankOrdersManualFirst() {
+        XCTAssertTrue(PhotoCandidate.Source.manual < .premierleague)
+        XCTAssertTrue(PhotoCandidate.Source.premierleague < .commons)
+    }
 }

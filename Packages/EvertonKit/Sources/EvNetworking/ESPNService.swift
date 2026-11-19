@@ -7,6 +7,7 @@ public struct ESPNService: FootballService {
     let session: URLSession
     let cache: DiskCache
     private let bio: WikidataBio
+    let photos: PhotoCache
     private let site = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1"
     private let v2 = "https://site.api.espn.com/apis/v2/sports/soccer/eng.1"
 
@@ -16,6 +17,7 @@ public struct ESPNService: FootballService {
         self.session = session
         self.cache = cache
         self.bio = WikidataBio(session: session, cache: cache)
+        self.photos = PhotoCache(session: session)
     }
 
     private enum TTL {
@@ -80,8 +82,13 @@ public struct ESPNService: FootballService {
         } else if let name = await espnNames(clubID: clubID)?.first, let qid = await bio.teamQID(forClub: name) {
             enriched = await bio.enrich(players, teamQID: qid)
         }
-        // 사진: 수동 지정 > 프리미어리그 공식(개인 열람용) > Commons > 이니셜. 수동 지정은 PlayerBio.overrides 에서 따로 관리한다.
-        return await attachPLPhotos(enriched, clubID: clubID)
+        // 사진: 후보(수동 지정 > PL 공식 > Commons)를 PhotoCache 가 내려받아 검증·저장한 것만 로컬 파일로 쓴다. 없으면 이니셜.
+        var candidates = await plCandidates(enriched, clubID: clubID)
+        for p in enriched {
+            guard let url = p.photoURL else { continue }                       // WikidataBio 가 확정한 Commons 사진
+            candidates[p.id, default: []].append(PhotoCandidate(url: url, source: .commons, credit: p.photoCredit))
+        }
+        return await photos.apply(enriched, candidates: candidates)
     }
 
     public func clubs() async throws -> [ClubInfo] {

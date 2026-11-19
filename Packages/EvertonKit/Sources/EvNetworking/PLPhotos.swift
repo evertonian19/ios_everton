@@ -14,61 +14,51 @@ public enum PLPhotos {
         URL(string: "https://resources.premierleague.com/premierleague25/photos/players/110x140/\(id).png")
     }
 
-    /// 선수들에게 PL 사진을 붙인다(Commons 보다 우선). `keep` 의 선수는 건드리지 않는다.
-    static func attach(_ players: [Player], entries: [PLSquadParser.Entry], validate: @Sendable (String) async -> Bool,
-                       keep: Set<Int> = []) async -> [Player] {
-        var found: [Int: PLSquadParser.Entry] = [:]
-        for p in players where !keep.contains(p.id) { if let e = PLSquadParser.match(p.name, entries) { found[p.id] = e } }
-        var ok: [String: Bool] = [:]
-        await withTaskGroup(of: (String, Bool).self) { group in
-            for id in Set(found.values.map(\.id)) { group.addTask { (id, await validate(id)) } }
-            for await (id, good) in group { ok[id] = good }
+    /// {선수 id: PL 사진 후보(고해상도 250x250 → 저해상도 110x140)}. `keep`(수동 지정) 선수는 제외한다.
+    /// 실제 다운로드·검증은 PhotoCache 가 한다.
+    static func candidates(_ players: [Player], entries: [PLSquadParser.Entry], keep: Set<Int> = []) -> [Int: [PhotoCandidate]] {
+        var out: [Int: [PhotoCandidate]] = [:]
+        for p in players where !keep.contains(p.id) {
+            guard let e = PLSquadParser.match(p.name, entries) else { continue }
+            let credit = PhotoCredit(author: credit.author, license: credit.license, licenseURL: nil,
+                                     pageURL: URL(string: "\(site)/en/players/\(e.id)/\(e.slug)/overview"))
+            out[p.id] = [hiURL(e.id), imageURL(e.id)].compactMap { $0 }.map { PhotoCandidate(url: $0, source: .premierleague, credit: credit) }
         }
-        return players.map { p in
-            guard let e = found[p.id], ok[e.id] == true, let url = imageURL(e.id) else { return p }
-            var q = p
-            q.photoURL = url
-            q.photoCredit = PhotoCredit(author: credit.author, license: credit.license, licenseURL: nil,
-                                        pageURL: URL(string: "\(site)/en/players/\(e.id)/\(e.slug)/overview"))
-            return q
-        }
+        return out
+    }
+
+    static func hiURL(_ id: String) -> URL? {
+        URL(string: "https://resources.premierleague.com/premierleague/photos/players/250x250/p\(id).png")
     }
 }
 
 extension ESPNService {
-    /// 구단의 PL 선수단 HTML 을 24시간 캐시로 읽어 사진을 붙인다. 구단 연결이나 네트워크가 실패하면 받은 목록 그대로.
-    func attachPLPhotos(_ players: [Player], clubID: Int, keep: Set<Int> = []) async -> [Player] {
-        guard PLPhotos.enabled, let names = await espnNames(clubID: clubID) else { return players }
+    /// 구단의 PL 선수단 HTML(7일 캐시, 실패 시 오래된 캐시)에서 사진 후보를 만든다. 구단 연결이나 네트워크가 실패하면 빈 값.
+    func plCandidates(_ players: [Player], clubID: Int, keep: Set<Int> = []) async -> [Int: [PhotoCandidate]] {
+        guard PLPhotos.enabled, let names = await espnNames(clubID: clubID) else { return [:] }
         let directory = PLClubDirectory(session: session, cache: cache)
         guard let plID = PLClubDirectory.clubID(for: names, in: await directory.clubs()),
-              let url = URL(string: "\(PLPhotos.site)/en/clubs/\(plID)/x/squad") else { return players }
+              let url = URL(string: "\(PLPhotos.site)/en/clubs/\(plID)/x/squad") else { return [:] }
         let key = "pl_squad_\(plID)"
         var html: String?
-        if let cached = await cache.data(for: key, maxAge: 86_400) { html = String(data: cached, encoding: .utf8) }
-        if html == nil {
+        if let cached = await cache.data(for: key, maxAge: 7 * 86_400) { html = String(data: cached, encoding: .utf8) }
+        if html == nil, await directory.mayRequest() {
             var request = URLRequest(url: url)
             request.timeoutInterval = 12
-            if let (data, response) = try? await session.data(for: request),
-               (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) == true {
-                await cache.store(data, for: key)
-                html = String(data: data, encoding: .utf8)
-            } else if let stale = await cache.data(for: key, maxAge: nil) {
-                html = String(data: stale, encoding: .utf8)
+            if let (data, response) = try? await session.data(for: request), let http = response as? HTTPURLResponse {
+                if http.statusCode == 429 { await directory.coolDown() }
+                else if (200..<300).contains(http.statusCode) {
+                    await cache.store(data, for: key)
+                    html = String(data: data, encoding: .utf8)
+                }
             }
+            if html == nil, let stale = await cache.data(for: key, maxAge: nil) { html = String(data: stale, encoding: .utf8) }
+        } else if html == nil, let stale = await cache.data(for: key, maxAge: nil) {
+            html = String(data: stale, encoding: .utf8)
         }
-        guard let html else { return players }
+        guard let html else { return [:] }
         let entries = PLSquadParser.parseSquad(html)
-        guard !entries.isEmpty else { return players }
-        let session = self.session
-        return await PLPhotos.attach(players, entries: entries, validate: { id in
-            guard let imageURL = PLPhotos.imageURL(id) else { return false }
-            var head = URLRequest(url: imageURL)
-            head.httpMethod = "HEAD"
-            head.timeoutInterval = 10
-            guard let (_, response) = try? await session.data(for: head), let http = response as? HTTPURLResponse else { return false }
-            // 사진이 없는 선수는 약 6KB 자리표시 이미지가 온다 → 2만 바이트 이상일 때만 실제 사진으로 본다.
-            return http.statusCode == 200 && http.expectedContentLength > 20_000
-        }, keep: keep)
+        return entries.isEmpty ? [:] : PLPhotos.candidates(players, entries: entries, keep: keep)
     }
 
     func espnNames(clubID: Int) async -> [String]? {

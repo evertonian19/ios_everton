@@ -22,9 +22,13 @@ actor PLClubDirectory {
     private let cache: DiskCache
     private var scanning = false
     private var cooldownUntil = Date.distantPast
+    static let spacing: UInt64 = 5_000_000_000
+    static let cooldown: TimeInterval = 1_800
+    /// 추정 후보(Opta id). 요청해서 <title> 이 맞을 때만 매핑에 들어간다.
+    static let priority = [8, 43, 34, 94, 91, 17, 56, 21, 90, 20, 13, 40]
     private let cacheKey = "pl_club_directory"
 
-    private struct Stored: Codable { var clubs: [Int: String]; var next: Int; var at: Date? }
+    private struct Stored: Codable { var clubs: [Int: String]; var tried: Set<Int>; var at: Date? }
 
     init(session: URLSession, cache: DiskCache) {
         self.session = session
@@ -48,6 +52,10 @@ actor PLClubDirectory {
     }
 
     /// 지금 알고 있는 매핑(시드+저장된 탐색 결과)을 즉시 돌려주고, 오래됐으면 백그라운드에서 이어서 탐색한다.
+    /// PL 에 요청해도 되는지(429 쿨다운 중이면 false). 선수단 HTML 요청도 같은 쿨다운을 공유한다.
+    func mayRequest() -> Bool { Date() >= cooldownUntil }
+    func coolDown() { cooldownUntil = Date().addingTimeInterval(Self.cooldown) }
+
     func clubs() async -> [Int: String] {
         let stored = await load()
         var merged = Self.seed
@@ -62,32 +70,34 @@ actor PLClubDirectory {
 
     private func load() async -> Stored {
         if let data = await cache.data(for: cacheKey, maxAge: nil), let s = try? JSONDecoder().decode(Stored.self, from: data) { return s }
-        return Stored(clubs: [:], next: 1, at: nil)
+        return Stored(clubs: [:], tried: [], at: nil)
     }
 
     private func save(_ s: Stored) async {
         if let data = try? JSONEncoder().encode(s) { await cache.store(data, for: cacheKey) }
     }
 
+    /// 추정 후보(priority) 먼저, 이어서 1…80 을 직렬·5초 간격으로 훑는다. 이미 시도한 id 와 시드는 건너뛰고, 429 면 30분 쉰다.
     private func scan() async {
         defer { scanning = false }
         var state = await load()
-        if state.next > Self.maxID { state.next = 1 }
-        while state.next <= Self.maxID {
-            guard let url = URL(string: "\(PLPhotos.site)/en/clubs/\(state.next)/x/squad") else { return }
+        let order = Array(NSOrderedSet(array: Self.priority + Array(1...Self.maxID))).compactMap { $0 as? Int }
+            .filter { !state.tried.contains($0) && Self.seed[$0] == nil }
+        for id in order {
+            guard Date() >= cooldownUntil, let url = URL(string: "\(PLPhotos.site)/en/clubs/\(id)/x/squad") else { break }
             var request = URLRequest(url: url)
             request.timeoutInterval = 12
             if let (data, response) = try? await session.data(for: request), let http = response as? HTTPURLResponse {
-                if http.statusCode == 429 { cooldownUntil = Date().addingTimeInterval(600); await save(state); return }
+                if http.statusCode == 429 { coolDown(); await save(state); return }
                 if http.statusCode == 200, let html = String(data: data, encoding: .utf8), let name = PLSquadParser.clubName(html) {
-                    state.clubs[state.next] = name
+                    state.clubs[id] = name
                 }
             }
-            state.next += 1
+            state.tried.insert(id)
             await save(state)
-            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            try? await Task.sleep(nanoseconds: Self.spacing)
         }
-        state.at = Date()
+        if state.tried.union(Self.seed.keys).count >= Self.maxID { state.at = Date() }
         await save(state)
     }
 }
