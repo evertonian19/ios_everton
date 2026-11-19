@@ -123,6 +123,7 @@ public struct FormBadge: View {
 public struct RatingRing: View {
     let rating: Double?
     let size: CGFloat
+    @State private var shown = false
 
     public init(_ rating: Double?, size: CGFloat = 44) {
         self.rating = rating
@@ -134,7 +135,7 @@ public struct RatingRing: View {
         ZStack {
             Circle().stroke(Theme.line, lineWidth: size * 0.09)
             Circle()
-                .trim(from: 0, to: min(max((rating ?? 0) / 10, 0), 1))
+                .trim(from: 0, to: shown ? min(max((rating ?? 0) / 10, 0), 1) : 0)
                 .stroke(color, style: StrokeStyle(lineWidth: size * 0.09, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text(Fmt.rating(rating))
@@ -142,6 +143,7 @@ public struct RatingRing: View {
                 .foregroundStyle(color)
         }
         .frame(width: size, height: size)
+        .onAppear { withAnimation(.easeOut(duration: 0.9)) { shown = true } }
     }
 }
 
@@ -172,6 +174,7 @@ public struct PositionTag: View {
 
 public struct StatCompareRow: View {
     let line: StatLine
+    @State private var grown = false
 
     public init(_ line: StatLine) { self.line = line }
 
@@ -191,50 +194,13 @@ public struct StatCompareRow: View {
             GeometryReader { proxy in
                 HStack(spacing: 3) {
                     Capsule().fill(Theme.blue)
-                        .frame(width: max(proxy.size.width * line.home / total - 1.5, 4))
+                        .frame(width: max(proxy.size.width * (grown ? line.home / total : 0.5) - 1.5, 4))
                     Capsule().fill(Theme.line)
-                        .frame(width: max(proxy.size.width * line.away / total - 1.5, 4))
+                        .frame(width: max(proxy.size.width * (grown ? line.away / total : 0.5) - 1.5, 4))
                 }
             }
             .frame(height: 6)
+            .onAppear { withAnimation(.spring(duration: 0.7)) { grown = true } }
         }
-    }
-}
-
-// MARK: - 선수 카드
-
-public struct PlayerCard: View {
-    let player: Player
-
-    public init(_ player: Player) { self.player = player }
-
-    public var body: some View {
-        VStack(spacing: 8) {
-            ZStack(alignment: .topLeading) {
-                PlayerPhoto(url: player.photoURL, name: player.name, size: 72)
-                    .frame(maxWidth: .infinity)
-                if let number = player.number {
-                    Text("\(number)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Theme.gold)
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Theme.deepBlue, in: Capsule())
-                }
-                RatingRing(player.stats?.rating, size: 30)
-                    .frame(maxWidth: .infinity, maxHeight: 72, alignment: .bottomTrailing)
-                    .padding(.trailing, 4)
-            }
-            Text(player.shortName)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-            PositionTag(player.position)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity)
-        .background(
-            LinearGradient(colors: [Theme.surfaceHigh, Theme.surface], startPoint: .top, endPoint: .bottom),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.line.opacity(0.6), lineWidth: 1))
     }
 }

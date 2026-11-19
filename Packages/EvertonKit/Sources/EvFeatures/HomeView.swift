@@ -4,6 +4,7 @@ import EvDesign
 
 struct HomeView: View {
     @Environment(AppModel.self) private var model
+    @State private var showCheck = false
 
     var body: some View {
         NavigationStack {
@@ -64,6 +65,13 @@ struct HomeView: View {
             .navigationTitle("EVERTON")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await model.loadAll() }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showCheck = true } label: { Image(systemName: "checkmark.shield") }
+                        .accessibilityLabel("데이터 점검")
+                }
+            }
+            .sheet(isPresented: $showCheck) { DataCheckView() }
             .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
             .navigationDestination(for: Player.self) { PlayerDetailView(player: $0) }
         }
@@ -88,7 +96,7 @@ private struct NextMatchHero: View {
 
             HStack {
                 VStack(spacing: 6) {
-                    ClubLogo(url: match.home.logoURL, size: 64)
+                    ClubLogo(url: match.home.logoURL, size: 64).shadow(color: Theme.blue.opacity(0.7), radius: 14)
                     Text(match.home.name).font(.footnote.weight(.semibold)).multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
@@ -103,6 +111,7 @@ private struct NextMatchHero: View {
                             Text(Fmt.countdown(to: match.kickoff, from: context.date) ?? "곧 시작")
                                 .font(.system(.footnote, design: .monospaced).weight(.semibold))
                                 .foregroundStyle(Theme.textPrimary)
+                                .contentTransition(.numericText())
                         }
                     }
                 }

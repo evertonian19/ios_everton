@@ -82,13 +82,20 @@ struct MatchDetailView: View {
 
     @ViewBuilder
     private func statsSection(_ detail: MatchDetail) -> some View {
-        if detail.stats.isEmpty {
-            emptyNote("아직 경기 통계가 없습니다.")
-        } else {
-            VStack(spacing: 14) {
-                ForEach(detail.stats) { StatCompareRow($0) }
+        VStack(spacing: 16) {
+            if !detail.events.isEmpty {
+                SectionTitle("주요 장면")
+                EventTimeline(events: detail.events, match: match)
             }
-            .evCard()
+            if detail.stats.isEmpty {
+                emptyNote("아직 경기 통계가 없습니다.")
+            } else {
+                SectionTitle("경기 통계")
+                VStack(spacing: 14) {
+                    ForEach(detail.stats) { StatCompareRow($0) }
+                }
+                .evCard()
+            }
         }
     }
 

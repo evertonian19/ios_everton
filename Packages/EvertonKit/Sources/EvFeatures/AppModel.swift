@@ -43,6 +43,7 @@ public final class AppModel {
     public var matches: LoadState<[Match]> = .idle
     public var squad: LoadState<[Player]> = .idle
     public var news: LoadState<[NewsItem]> = .idle
+    public var standings: LoadState<[StandingRow]> = .idle
 
     public init(services: AppServices) {
         self.services = services
@@ -52,7 +53,8 @@ public final class AppModel {
         async let a: Void = loadMatches()
         async let b: Void = loadSquad()
         async let c: Void = loadNews()
-        _ = await (a, b, c)
+        async let d: Void = loadStandings()
+        _ = await (a, b, c, d)
     }
 
     public func loadMatches() async {
@@ -71,5 +73,11 @@ public final class AppModel {
         if news.value == nil { news = .loading }
         do { news = .loaded(try await services.news.headlines()) }
         catch { if news.value == nil { news = .failed(error.localizedDescription) } }
+    }
+
+    public func loadStandings() async {
+        if standings.value == nil { standings = .loading }
+        do { standings = .loaded(try await services.football.standings()) }
+        catch { if standings.value == nil { standings = .failed(error.localizedDescription) } }
     }
 }
