@@ -15,8 +15,8 @@ public struct RootView: View {
                 .tabItem { Label("홈", systemImage: "house.fill") }
             FixturesView()
                 .tabItem { Label("일정", systemImage: "calendar") }
-            StandingsView()
-                .tabItem { Label("순위", systemImage: "list.number") }
+            LeagueView()
+                .tabItem { Label("리그", systemImage: "trophy.fill") }
             SquadView()
                 .tabItem { Label("스쿼드", systemImage: "person.3.fill") }
             NewsView()

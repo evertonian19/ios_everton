@@ -2,7 +2,8 @@ import SwiftUI
 import EvCore
 import EvDesign
 
-struct StandingsView: View {
+/// 순위표 본문. 리그 탭 안에서 쓰며, 행을 누르면 구단 상세로 이동한다.
+struct StandingsContent: View {
     @Environment(AppModel.self) private var model
 
     private func zoneColor(_ zone: StandingRow.Zone) -> Color {
@@ -16,14 +17,13 @@ struct StandingsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LoadStateView(state: model.standings, retry: { await model.loadStandings() }) { rows in
+        LoadStateView(state: model.standings, retry: { await model.loadStandings() }) { rows in
                     VStack(spacing: 10) {
                         header
                         VStack(spacing: 0) {
                             ForEach(rows) { row in
                                 let mine = row.club.id == EvertonInfo.teamID
+                                NavigationLink(value: row.club) {
                                 HStack(spacing: 8) {
                                     RoundedRectangle(cornerRadius: 2).fill(zoneColor(row.zone)).frame(width: 3, height: 26)
                                     Text("\(row.rank)").frame(width: 22).font(.footnote.weight(.heavy))
@@ -40,18 +40,14 @@ struct StandingsView: View {
                                 .foregroundStyle(mine ? Theme.gold : Theme.textPrimary)
                                 .padding(.vertical, 7).padding(.horizontal, 8)
                                 .background(mine ? Theme.deepBlue.opacity(0.55) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                         .evCard()
                         legend
                     }
                     .padding(16)
-                }
-            }
-            .background(Theme.background)
-            .navigationTitle("순위")
-            .navigationBarTitleDisplayMode(.inline)
-            .refreshable { await model.loadStandings() }
         }
     }
 

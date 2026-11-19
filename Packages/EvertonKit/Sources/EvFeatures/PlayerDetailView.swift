@@ -21,6 +21,8 @@ struct PlayerDetailView: View {
         ScrollView {
             VStack(spacing: 18) {
                 hero
+                bodyCard
+                strengthTags
                 let metrics = PlayerMetrics.radar(for: player)
                 if !metrics.isEmpty {
                     VStack(spacing: 4) {
@@ -59,6 +61,42 @@ struct PlayerDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    private var bodyCard: some View {
+        HStack {
+            bodyFact("키", Fmt.height(player.heightCM))
+            bodyFact("몸무게", Fmt.weight(player.weightKG))
+            bodyFact("생년월일", Fmt.birthday(player.birthDate))
+            bodyFact("출생지", player.birthPlace ?? "-")
+        }
+        .evCard()
+    }
+
+    private func bodyFact(_ label: String, _ value: String) -> some View {
+        VStack(spacing: 3) {
+            Text(value).font(.footnote.weight(.bold)).foregroundStyle(Theme.textPrimary)
+                .lineLimit(2).multilineTextAlignment(.center).minimumScaleFactor(0.7)
+            Text(label).font(.caption2).foregroundStyle(Theme.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// 시즌 스탯에서 계산한 강점(데이터가 부족하면 표시하지 않음).
+    @ViewBuilder
+    private var strengthTags: some View {
+        let strengths = PlayerMetrics.strengths(for: player)
+        if !strengths.isEmpty {
+            HStack(spacing: 8) {
+                Text("강점").font(.caption.weight(.heavy)).foregroundStyle(Theme.textSecondary)
+                ForEach(strengths, id: \.self) { item in
+                    Text(item).font(.footnote.weight(.bold)).foregroundStyle(.black.opacity(0.85))
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(Theme.gold, in: Capsule())
+                }
+                Spacer()
+            }
+        }
+    }
+
     private var hero: some View {
         HStack(spacing: 16) {
             PlayerPhoto(url: player.photoURL, name: player.name, size: 104)
@@ -70,7 +108,8 @@ struct PlayerDetailView: View {
                     PositionTag(player.position)
                 }
                 Text(player.name).font(.title3.weight(.bold)).foregroundStyle(Theme.textPrimary)
-                Text([player.age.map { "\($0)세" }, player.nationality].compactMap { $0 }.joined(separator: " · "))
+                Text([player.age.map { "\($0)세" }, player.nationality.map { "\(Flags.emoji(for: $0)) \($0)" }]
+                        .compactMap { $0 }.joined(separator: " · "))
                     .font(.footnote).foregroundStyle(Theme.textSecondary)
             }
             Spacer(minLength: 0)

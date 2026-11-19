@@ -56,7 +56,7 @@ public struct ClubLogo: View {
         AsyncImage(url: url) { phase in
             switch phase {
             case .success(let image): image.resizable().scaledToFit()
-            default: Image(systemName: "shield.fill").resizable().scaledToFit().foregroundStyle(Theme.line)
+            default: Image(systemName: "shield.lefthalf.filled").resizable().scaledToFit().foregroundStyle(Theme.line)
             }
         }
         .frame(width: size, height: size)
