@@ -1,0 +1,109 @@
+import Foundation
+import EvCore
+
+public struct APIFootballService: FootballService {
+    private let apiKey: String
+    private let session: URLSession
+    private let cache: DiskCache
+    private let baseURL = URL(string: "https://v3.football.api-sports.io")!
+
+    public init(apiKey: String, session: URLSession = .shared, cache: DiskCache = DiskCache()) {
+        self.apiKey = apiKey
+        self.session = session
+        self.cache = cache
+    }
+
+    // MARK: - 공통 요청
+
+    /// 캐시가 신선하면 그대로 쓰고, 네트워크가 실패하면 오래된 캐시라도 돌려준다.
+    private func fetch<T: Decodable>(_ path: String, _ query: [String: String], ttl: TimeInterval,
+                                     as type: T.Type) async throws -> Envelope<T> {
+        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        components.queryItems = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+        let url = components.url!
+        let key = url.absoluteString
+
+        if let cached = await cache.data(for: key, maxAge: ttl),
+           let decoded = try? JSONDecoder().decode(Envelope<T>.self, from: cached) {
+            return decoded
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue(apiKey, forHTTPHeaderField: "x-apisports-key")
+        request.timeoutInterval = 20
+        do {
+            let (data, response) = try await session.data(for: request)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                throw ServiceError.badResponse(http.statusCode)
+            }
+            let decoded = try JSONDecoder().decode(Envelope<T>.self, from: data)
+            if let message = decoded.errorMessage { throw ServiceError.server(message) }
+            await cache.store(data, for: key)
+            return decoded
+        } catch {
+            if let stale = await cache.data(for: key, maxAge: nil),
+               let decoded = try? JSONDecoder().decode(Envelope<T>.self, from: stale) {
+                return decoded
+            }
+            throw error
+        }
+    }
+
+    // MARK: - FootballService
+
+    public func matches() async throws -> [Match] {
+        let result = try await fetch("fixtures",
+                                     ["team": String(EvertonInfo.teamID), "season": String(EvertonInfo.season)],
+                                     ttl: 600, as: [FixtureDTO].self)
+        return result.response.compactMap(Mapping.match).sorted { $0.kickoff < $1.kickoff }
+    }
+
+    public func detail(of match: Match) async throws -> MatchDetail {
+        let id = String(match.id)
+        // 끝난 경기는 오래 캐시, 진행/예정 경기는 짧게.
+        let ttl: TimeInterval = match.phase == .finished ? 86_400 : 60
+        async let statsRequest = fetch("fixtures/statistics", ["fixture": id], ttl: ttl, as: [StatisticsDTO].self)
+        async let lineupRequest = fetch("fixtures/lineups", ["fixture": id], ttl: ttl, as: [LineupDTO].self)
+        async let playersRequest = fetch("fixtures/players", ["fixture": id], ttl: ttl, as: [FixturePlayersDTO].self)
+
+        let stats = (try? await statsRequest.response) ?? []
+        let lineups = (try? await lineupRequest.response) ?? []
+        let players = (try? await playersRequest.response) ?? []
+
+        return MatchDetail(
+            match: match,
+            stats: Mapping.statLines(stats, homeID: match.home.id),
+            lineups: Mapping.lineups(lineups, ratings: Mapping.ratings(players)))
+    }
+
+    public func squad() async throws -> [Player] {
+        let squadResult = try await fetch("players/squads", ["team": String(EvertonInfo.teamID)],
+                                          ttl: 86_400, as: [SquadDTO].self)
+        let members = squadResult.response.first?.players ?? []
+
+        // 시즌 스탯은 페이지 단위로 온다. 실패해도 스쿼드는 보여 준다.
+        var statsByID: [Int: SeasonPlayerDTO] = [:]
+        var page = 1
+        var total = 1
+        while page <= total && page <= 4 {
+            guard let result = try? await fetch(
+                "players",
+                ["team": String(EvertonInfo.teamID), "season": String(EvertonInfo.season), "page": String(page)],
+                ttl: 21_600, as: [SeasonPlayerDTO].self) else { break }
+            for dto in result.response { statsByID[dto.player.id] = dto }
+            total = result.paging?.total ?? 1
+            page += 1
+        }
+
+        return members.map { member in
+            let season = statsByID[member.id]
+            return Player(
+                id: member.id, name: member.name, number: member.number,
+                position: Position(apiName: member.position), age: member.age ?? season?.player.age,
+                nationality: season?.player.nationality,
+                photoURL: (member.photo ?? season?.player.photo).flatMap(URL.init(string:)),
+                stats: season.flatMap(Mapping.stats))
+        }
+        .sorted { ($0.number ?? 99) < ($1.number ?? 99) }
+    }
+}
