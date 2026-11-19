@@ -1,0 +1,273 @@
+import Foundation
+
+public enum EvertonInfo {
+    public static let teamID = 45
+    public static let leagueID = 39
+    public static let season = 2026
+    public static let teamName = "Everton"
+}
+
+public struct Club: Hashable, Codable, Sendable, Identifiable {
+    public let id: Int
+    public let name: String
+    public let logoURL: URL?
+
+    public init(id: Int, name: String, logoURL: URL? = nil) {
+        self.id = id
+        self.name = name
+        self.logoURL = logoURL
+    }
+}
+
+public enum MatchPhase: String, Codable, Sendable {
+    case upcoming, live, finished, other
+}
+
+public enum MatchResult: String, Codable, Sendable {
+    case win, draw, loss
+
+    public var letter: String {
+        switch self {
+        case .win: return "W"
+        case .draw: return "D"
+        case .loss: return "L"
+        }
+    }
+}
+
+public struct Match: Hashable, Codable, Sendable, Identifiable {
+    public let id: Int
+    public let kickoff: Date
+    public let competition: String
+    public let round: String
+    public let venue: String?
+    public let home: Club
+    public let away: Club
+    public let homeGoals: Int?
+    public let awayGoals: Int?
+    public let phase: MatchPhase
+    public let statusText: String
+    public let elapsed: Int?
+
+    public init(id: Int, kickoff: Date, competition: String, round: String, venue: String?,
+                home: Club, away: Club, homeGoals: Int?, awayGoals: Int?,
+                phase: MatchPhase, statusText: String, elapsed: Int?) {
+        self.id = id
+        self.kickoff = kickoff
+        self.competition = competition
+        self.round = round
+        self.venue = venue
+        self.home = home
+        self.away = away
+        self.homeGoals = homeGoals
+        self.awayGoals = awayGoals
+        self.phase = phase
+        self.statusText = statusText
+        self.elapsed = elapsed
+    }
+
+    public func isHome(_ teamID: Int = EvertonInfo.teamID) -> Bool { home.id == teamID }
+
+    public func opponent(of teamID: Int = EvertonInfo.teamID) -> Club {
+        isHome(teamID) ? away : home
+    }
+
+    public func result(for teamID: Int = EvertonInfo.teamID) -> MatchResult? {
+        guard phase == .finished, let h = homeGoals, let a = awayGoals else { return nil }
+        let mine = isHome(teamID) ? h : a
+        let theirs = isHome(teamID) ? a : h
+        if mine > theirs { return .win }
+        if mine == theirs { return .draw }
+        return .loss
+    }
+
+    public var scoreText: String {
+        guard let h = homeGoals, let a = awayGoals else { return "-" }
+        return "\(h) : \(a)"
+    }
+}
+
+public enum Position: String, Codable, CaseIterable, Sendable {
+    case goalkeeper, defender, midfielder, attacker
+
+    public init(apiName: String?) {
+        switch apiName?.lowercased() {
+        case "goalkeeper", "g": self = .goalkeeper
+        case "defender", "d": self = .defender
+        case "midfielder", "m": self = .midfielder
+        default: self = .attacker
+        }
+    }
+
+    public var short: String {
+        switch self {
+        case .goalkeeper: return "GK"
+        case .defender: return "DF"
+        case .midfielder: return "MF"
+        case .attacker: return "FW"
+        }
+    }
+
+    public var title: String {
+        switch self {
+        case .goalkeeper: return "골키퍼"
+        case .defender: return "수비수"
+        case .midfielder: return "미드필더"
+        case .attacker: return "공격수"
+        }
+    }
+}
+
+public struct PlayerStats: Hashable, Codable, Sendable {
+    public var appearances: Int
+    public var minutes: Int
+    public var rating: Double?
+    public var goals: Int
+    public var assists: Int
+    public var shots: Int
+    public var shotsOnTarget: Int
+    public var passes: Int
+    public var keyPasses: Int
+    public var passAccuracy: Int
+    public var tackles: Int
+    public var dribbles: Int
+    public var yellow: Int
+    public var red: Int
+    public var saves: Int
+    public var conceded: Int
+
+    public init(appearances: Int = 0, minutes: Int = 0, rating: Double? = nil, goals: Int = 0,
+                assists: Int = 0, shots: Int = 0, shotsOnTarget: Int = 0, passes: Int = 0,
+                keyPasses: Int = 0, passAccuracy: Int = 0, tackles: Int = 0, dribbles: Int = 0,
+                yellow: Int = 0, red: Int = 0, saves: Int = 0, conceded: Int = 0) {
+        self.appearances = appearances
+        self.minutes = minutes
+        self.rating = rating
+        self.goals = goals
+        self.assists = assists
+        self.shots = shots
+        self.shotsOnTarget = shotsOnTarget
+        self.passes = passes
+        self.keyPasses = keyPasses
+        self.passAccuracy = passAccuracy
+        self.tackles = tackles
+        self.dribbles = dribbles
+        self.yellow = yellow
+        self.red = red
+        self.saves = saves
+        self.conceded = conceded
+    }
+}
+
+public struct Player: Hashable, Codable, Sendable, Identifiable {
+    public let id: Int
+    public let name: String
+    public let number: Int?
+    public let position: Position
+    public let age: Int?
+    public let nationality: String?
+    public let photoURL: URL?
+    public var stats: PlayerStats?
+
+    public init(id: Int, name: String, number: Int?, position: Position, age: Int?,
+                nationality: String? = nil, photoURL: URL?, stats: PlayerStats? = nil) {
+        self.id = id
+        self.name = name
+        self.number = number
+        self.position = position
+        self.age = age
+        self.nationality = nationality
+        self.photoURL = photoURL
+        self.stats = stats
+    }
+
+    /// 성만 보여 줄 때 사용 ("J. Pickford" -> "Pickford").
+    public var shortName: String {
+        name.split(separator: " ").last.map(String.init) ?? name
+    }
+}
+
+public struct LineupPlayer: Hashable, Codable, Sendable, Identifiable {
+    public let id: Int
+    public let name: String
+    public let number: Int?
+    public let position: String?
+    /// API 의 "행:열" 표기 (1:1 = 골키퍼). 교체 선수는 nil.
+    public let grid: String?
+    public var rating: Double?
+    public var photoURL: URL?
+
+    public init(id: Int, name: String, number: Int?, position: String?, grid: String?,
+                rating: Double? = nil, photoURL: URL? = nil) {
+        self.id = id
+        self.name = name
+        self.number = number
+        self.position = position
+        self.grid = grid
+        self.rating = rating
+        self.photoURL = photoURL
+    }
+
+    public var shortName: String {
+        name.split(separator: " ").last.map(String.init) ?? name
+    }
+}
+
+public struct TeamLineup: Hashable, Codable, Sendable {
+    public let club: Club
+    public let formation: String?
+    public let starters: [LineupPlayer]
+    public let substitutes: [LineupPlayer]
+
+    public init(club: Club, formation: String?, starters: [LineupPlayer], substitutes: [LineupPlayer]) {
+        self.club = club
+        self.formation = formation
+        self.starters = starters
+        self.substitutes = substitutes
+    }
+}
+
+public struct StatLine: Hashable, Codable, Sendable, Identifiable {
+    public var id: String { label }
+    public let label: String
+    public let home: Double
+    public let away: Double
+    public let isPercent: Bool
+
+    public init(label: String, home: Double, away: Double, isPercent: Bool) {
+        self.label = label
+        self.home = home
+        self.away = away
+        self.isPercent = isPercent
+    }
+}
+
+public struct MatchDetail: Hashable, Codable, Sendable {
+    public let match: Match
+    public let stats: [StatLine]
+    public let lineups: [TeamLineup]
+
+    public init(match: Match, stats: [StatLine], lineups: [TeamLineup]) {
+        self.match = match
+        self.stats = stats
+        self.lineups = lineups
+    }
+}
+
+public struct NewsItem: Hashable, Codable, Sendable, Identifiable {
+    public let id: String
+    public let title: String
+    public let summary: String
+    public let link: URL?
+    public let date: Date?
+    public let imageURL: URL?
+
+    public init(id: String, title: String, summary: String, link: URL?, date: Date?, imageURL: URL?) {
+        self.id = id
+        self.title = title
+        self.summary = summary
+        self.link = link
+        self.date = date
+        self.imageURL = imageURL
+    }
+}
