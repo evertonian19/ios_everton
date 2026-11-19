@@ -1,11 +1,3 @@
-# ios_everton
-
-Everton FC 팬을 위한 개인용 iOS 앱. 경기 일정, 경기 통계, 선수 스탯·평점, 번역된 기사를 한곳에서 봅니다.
-
-- 최소 iOS 18, SwiftUI
-- 데이터: [API-Football](https://www.api-football.com/) (경기·선수), RSS (기사)
-- 기사 한글 번역: 기기 내 Translation (최초 1회 언어팩 다운로드)
-- API 키가 없으면 샘플 데이터로 실행
 
 ## 화면
 
@@ -41,9 +33,3 @@ Config/         API 키 설정 예시
 5. 서명 팀을 선택하고 기기에서 실행.
 
 테스트: `cd Packages/EvertonKit && swift test`
-
-## 참고
-
-- 무료 플랜은 하루 100회 호출 제한이 있어 응답을 디스크에 캐시합니다.
-- 시즌은 `EvCore/Models.swift` 의 `EvertonInfo.season` 에서 바꿉니다.
-- 기사 피드는 `RSSNewsService.defaultFeeds` 에서 바꿉니다.
