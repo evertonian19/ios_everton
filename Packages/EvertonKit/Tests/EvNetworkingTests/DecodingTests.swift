@@ -104,4 +104,25 @@ final class DecodingTests: XCTestCase {
         let envelope = try JSONDecoder().decode(Envelope<[LeagueInfoDTO]>.self, from: json)
         XCTAssertEqual(envelope.response.first?.seasons.first(where: { $0.year == EvertonInfo.season })?.start, "2026-08-22")
     }
+
+    func testClubsMapping() throws {
+        let json = """
+        {"response":[{"team":{"id":45,"name":"Everton","code":"EVE","country":"England","founded":1878,"logo":"https://x/45.png"},
+          "venue":{"name":"Hill Dickinson Stadium","city":"Liverpool","capacity":52888,"image":"https://x/v.png"}}]}
+        """.data(using: .utf8)!
+        let envelope = try JSONDecoder().decode(Envelope<[TeamEntryDTO]>.self, from: json)
+        let info = try XCTUnwrap(envelope.response.map(Mapping.clubInfo).first)
+        XCTAssertEqual(info.founded, 1878)
+        XCTAssertEqual(info.capacity, 52888)
+        XCTAssertEqual(info.venueName, "Hill Dickinson Stadium")
+    }
+
+    func testBodyAndBirthParsing() {
+        XCTAssertEqual(Mapping.number("185 cm"), 185)
+        XCTAssertEqual(Mapping.number("79 kg"), 79)
+        XCTAssertNil(Mapping.number(nil))
+        XCTAssertNil(Mapping.number("N/A"))
+        XCTAssertNotNil(Mapping.birthDate("1994-03-07"))
+        XCTAssertNil(Mapping.birthDate("garbage"))
+    }
 }

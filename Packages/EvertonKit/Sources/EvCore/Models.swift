@@ -168,9 +168,18 @@ public struct Player: Hashable, Codable, Sendable, Identifiable {
     public let nationality: String?
     public let photoURL: URL?
     public var stats: PlayerStats?
+    public var heightCM: Int?
+    public var weightKG: Int?
+    public var birthDate: Date?
+    public var birthPlace: String?
 
     public init(id: Int, name: String, number: Int?, position: Position, age: Int?,
-                nationality: String? = nil, photoURL: URL?, stats: PlayerStats? = nil) {
+                nationality: String? = nil, photoURL: URL?, stats: PlayerStats? = nil,
+                heightCM: Int? = nil, weightKG: Int? = nil, birthDate: Date? = nil, birthPlace: String? = nil) {
+        self.heightCM = heightCM
+        self.weightKG = weightKG
+        self.birthDate = birthDate
+        self.birthPlace = birthPlace
         self.id = id
         self.name = name
         self.number = number

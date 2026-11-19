@@ -124,11 +124,15 @@ struct SquadDTO: Decodable {
 
 struct SeasonPlayerDTO: Decodable {
     struct Person: Decodable {
+        struct Birth: Decodable { let date: String?; let place: String? }
         let id: Int
         let name: String
         let age: Int?
         let nationality: String?
         let photo: String?
+        let height: String?
+        let weight: String?
+        let birth: Birth?
     }
     struct Stat: Decodable {
         struct League: Decodable { let id: Int? }
@@ -200,4 +204,23 @@ struct LeagueInfoDTO: Decodable {
         let current: Bool?
     }
     let seasons: [Season]
+}
+
+struct TeamEntryDTO: Decodable {
+    struct Team: Decodable {
+        let id: Int
+        let name: String
+        let code: String?
+        let country: String?
+        let founded: Int?
+        let logo: String?
+    }
+    struct Venue: Decodable {
+        let name: String?
+        let city: String?
+        let capacity: Int?
+        let image: String?
+    }
+    let team: Team
+    let venue: Venue?
 }

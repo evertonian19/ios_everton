@@ -3,9 +3,15 @@ import Foundation
 public protocol FootballService: Sendable {
     func matches() async throws -> [Match]
     func detail(of match: Match) async throws -> MatchDetail
-    func squad() async throws -> [Player]
+    func squad(of clubID: Int) async throws -> [Player]
+    func clubs() async throws -> [ClubInfo]
     func standings() async throws -> [StandingRow]
     func diagnostics() async -> DataReport
+}
+
+public extension FootballService {
+    /// 기본 구단(Everton)의 스쿼드.
+    func squad() async throws -> [Player] { try await squad(of: EvertonInfo.teamID) }
 }
 
 public protocol NewsService: Sendable {

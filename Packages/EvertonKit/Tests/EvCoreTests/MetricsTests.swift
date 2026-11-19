@@ -21,4 +21,22 @@ final class MetricsTests: XCTestCase {
         let ratings = top.compactMap { $0.stats?.rating }
         XCTAssertEqual(ratings, ratings.sorted(by: >))
     }
+
+    func testStrengthsAreAtMostTwoAndKnownLabels() {
+        let labels = Set(Sample.players.flatMap { PlayerMetrics.radar(for: $0).map(\.label) })
+        for player in Sample.players {
+            let strengths = PlayerMetrics.strengths(for: player)
+            XCTAssertLessThanOrEqual(strengths.count, 2)
+            for item in strengths { XCTAssertTrue(labels.contains(item)) }
+        }
+    }
+
+    func testFlagsAndBodyFormatting() {
+        XCTAssertEqual(Flags.emoji(for: "Brazil"), "🇧🇷")
+        XCTAssertEqual(Flags.emoji(for: "Ivory Coast"), "🇨🇮")
+        XCTAssertEqual(Flags.emoji(for: "Atlantis"), "")
+        XCTAssertEqual(Fmt.height(185), "185 cm")
+        XCTAssertEqual(Fmt.weight(nil), "-")
+        XCTAssertEqual(Fmt.capacity(52888), "52,888명")
+    }
 }

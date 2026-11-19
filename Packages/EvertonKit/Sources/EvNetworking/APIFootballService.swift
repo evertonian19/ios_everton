@@ -115,8 +115,15 @@ public struct APIFootballService: FootballService {
         return report
     }
 
-    public func squad() async throws -> [Player] {
-        let squadResult = try await fetch("players/squads", ["team": String(EvertonInfo.teamID)],
+    public func clubs() async throws -> [ClubInfo] {
+        let result = try await fetch("teams",
+                                     ["league": String(EvertonInfo.leagueID), "season": String(EvertonInfo.season)],
+                                     ttl: 86_400, as: [TeamEntryDTO].self)
+        return result.response.map(Mapping.clubInfo).sorted { $0.club.name < $1.club.name }
+    }
+
+    public func squad(of clubID: Int) async throws -> [Player] {
+        let squadResult = try await fetch("players/squads", ["team": String(clubID)],
                                           ttl: 86_400, as: [SquadDTO].self)
         let members = squadResult.response.first?.players ?? []
 
@@ -127,7 +134,7 @@ public struct APIFootballService: FootballService {
         while page <= total && page <= 4 {
             guard let result = try? await fetch(
                 "players",
-                ["team": String(EvertonInfo.teamID), "season": String(EvertonInfo.season), "page": String(page)],
+                ["team": String(clubID), "season": String(EvertonInfo.season), "page": String(page)],
                 ttl: 21_600, as: [SeasonPlayerDTO].self) else { break }
             for dto in result.response { statsByID[dto.player.id] = dto }
             total = result.paging?.total ?? 1
@@ -141,7 +148,9 @@ public struct APIFootballService: FootballService {
                 position: Position(apiName: member.position), age: member.age ?? season?.player.age,
                 nationality: season?.player.nationality,
                 photoURL: (member.photo ?? season?.player.photo).flatMap(URL.init(string:)),
-                stats: season.flatMap(Mapping.stats))
+                stats: season.flatMap(Mapping.stats),
+                heightCM: Mapping.number(season?.player.height), weightKG: Mapping.number(season?.player.weight),
+                birthDate: Mapping.birthDate(season?.player.birth?.date), birthPlace: season?.player.birth?.place)
         }
         .sorted { ($0.number ?? 99) < ($1.number ?? 99) }
     }

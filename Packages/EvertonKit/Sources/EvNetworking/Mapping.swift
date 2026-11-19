@@ -23,6 +23,30 @@ enum Mapping {
         }
     }
 
+    private static let birthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    /// "185 cm", "79 kg" 같은 문자열에서 숫자만 꺼낸다.
+    static func number(_ text: String?) -> Int? {
+        guard let text else { return nil }
+        let digits = text.filter(\.isNumber)
+        return digits.isEmpty ? nil : Int(digits)
+    }
+
+    static func birthDate(_ text: String?) -> Date? { text.flatMap { birthFormatter.date(from: $0) } }
+
+    static func clubInfo(_ dto: TeamEntryDTO) -> ClubInfo {
+        ClubInfo(club: Club(id: dto.team.id, name: dto.team.name, logoURL: dto.team.logo.flatMap(URL.init(string:))),
+                 code: dto.team.code, country: dto.team.country, founded: dto.team.founded,
+                 venueName: dto.venue?.name, city: dto.venue?.city, capacity: dto.venue?.capacity,
+                 venueImageURL: dto.venue?.image.flatMap(URL.init(string:)))
+    }
+
     static func match(_ dto: FixtureDTO) -> Match? {
         guard let kickoff = date(dto.fixture.date) else { return nil }
         return Match(

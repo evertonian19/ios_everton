@@ -41,6 +41,13 @@ public enum PlayerMetrics {
         ]
     }
 
+    /// 시즌 스탯에서 가장 높게 나온 지표 이름 2개. 데이터가 부족하면 빈 배열.
+    public static func strengths(for player: Player, limit: Int = 2) -> [String] {
+        guard let s = player.stats, s.minutes >= 180 else { return [] }
+        let metrics = radar(for: player).filter { $0.value >= 0.35 }
+        return metrics.sorted { $0.value > $1.value }.prefix(limit).map(\.label)
+    }
+
     /// 평점 순 상위 선수. 출전이 너무 적은 선수는 우연히 높은 평점이 나오므로 제외한다.
     public static func topRated(_ players: [Player], limit: Int = 6, minAppearances: Int = 3) -> [Player] {
         let rated = players.filter { ($0.stats?.rating ?? 0) > 0 }

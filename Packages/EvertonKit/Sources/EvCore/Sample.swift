@@ -105,6 +105,19 @@ public enum Sample {
         }
     }()
 
+    public static let clubs: [ClubInfo] = {
+        let list: [(Int, String, Int, String, Int)] = [
+            (45, "Everton", 1878, "Hill Dickinson Stadium", 52_888), (42, "Arsenal", 1886, "Emirates Stadium", 60_704),
+            (40, "Liverpool", 1892, "Anfield", 61_276), (50, "Manchester City", 1880, "Etihad Stadium", 53_400),
+            (33, "Manchester United", 1878, "Old Trafford", 74_310), (47, "Tottenham", 1882, "Tottenham Hotspur Stadium", 62_850),
+            (34, "Newcastle", 1892, "St. James' Park", 52_257), (66, "Aston Villa", 1874, "Villa Park", 42_657),
+        ]
+        return list.map { entry in
+            ClubInfo(club: Club(id: entry.0, name: entry.1, logoURL: logo(entry.0)), country: "England", founded: entry.2,
+                     venueName: entry.3, city: nil, capacity: entry.4, venueImageURL: nil)
+        }
+    }()
+
     public static let news: [NewsItem] = [
         NewsItem(id: "s1", title: "Everton make strong start to the new season",
                  summary: "The Blues have picked up momentum after a solid run of results at home.",
@@ -122,7 +135,8 @@ public struct MockFootballService: FootballService {
         let base = Sample.detail
         return MatchDetail(match: match, stats: base.stats, lineups: base.lineups, events: Sample.events(for: match))
     }
-    public func squad() async throws -> [Player] { Sample.players }
+    public func squad(of clubID: Int) async throws -> [Player] { Sample.players }
+    public func clubs() async throws -> [ClubInfo] { Sample.clubs }
     public func standings() async throws -> [StandingRow] { Sample.standings }
     public func diagnostics() async -> DataReport {
         DataReport(seasonFound: true, seasonStart: "2026-08-15", seasonEnd: "2027-05-30",

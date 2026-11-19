@@ -150,3 +150,27 @@ public struct DataReport: Hashable, Codable, Sendable {
         return list
     }
 }
+
+public struct ClubInfo: Hashable, Codable, Sendable, Identifiable {
+    public var id: Int { club.id }
+    public let club: Club
+    public let code: String?
+    public let country: String?
+    public let founded: Int?
+    public let venueName: String?
+    public let city: String?
+    public let capacity: Int?
+    public let venueImageURL: URL?
+
+    public init(club: Club, code: String? = nil, country: String? = nil, founded: Int? = nil,
+                venueName: String? = nil, city: String? = nil, capacity: Int? = nil, venueImageURL: URL? = nil) {
+        self.club = club
+        self.code = code
+        self.country = country
+        self.founded = founded
+        self.venueName = venueName
+        self.city = city
+        self.capacity = capacity
+        self.venueImageURL = venueImageURL
+    }
+}
