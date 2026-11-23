@@ -22,6 +22,7 @@ struct ClubDetailView: View {
             .padding(10)
         }
         .background(Theme.background)
+        .evBrandBars()
         .navigationTitle(club.display)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.loadRoster(club.id) }
@@ -34,12 +35,11 @@ struct ClubDetailView: View {
             Text(club.name).font(.title3.weight(.bold)).foregroundStyle(.white)
             if let standing {
                 Text("\(standing.rank)위 · 승점 \(standing.points) · \(standing.won)승 \(standing.drawn)무 \(standing.lost)패")
-                    .font(.footnote).foregroundStyle(Color(hex: 0xC9D3E6))
+                    .font(.footnote).foregroundStyle(Theme.onBrand2)
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity)
-        .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color(hex: 0x2B4A86), lineWidth: 1))
+        .evHero()
     }
 }

@@ -1,9 +1,9 @@
 import SwiftUI
 import EvCore
 
-// MARK: - 패널 (FM 의 헤더 바가 있는 카드)
+// MARK: - 카드 (제목이 있는 흰 카드)
 
-/// 제목 바 + 본문. 화면의 정보를 FM 처럼 구획으로 나눈다.
+/// 제목 + 본문. 헤더 바 없이 카드 안 첫 줄의 굵은 제목으로 구획을 나눈다.
 public struct FMPanel<Content: View>: View {
     let title: String?
     let trailing: String?
@@ -16,24 +16,19 @@ public struct FMPanel<Content: View>: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 10) {
             if let title {
                 HStack {
-                    Text(title)
-                        .font(.caption.weight(.heavy)).tracking(0.6)
-                        .foregroundStyle(Color(hex: 0xB9C4D6))
+                    Text(title).font(.subheadline.weight(.bold)).foregroundStyle(Theme.textPrimary)
                     Spacer()
-                    if let trailing { Text(trailing).font(.caption2).foregroundStyle(Theme.textSecondary) }
+                    if let trailing { Text(trailing).font(.caption).foregroundStyle(Theme.textSecondary) }
                 }
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(Theme.panelHeader)
-                Divider().overlay(Theme.line)
             }
-            content.padding(10).frame(maxWidth: .infinity, alignment: .leading)
+            content.frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Theme.line, lineWidth: 1))
+        .padding(14)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: Theme.shadow, radius: 3, y: 1)
     }
 }
 
@@ -41,14 +36,31 @@ public struct CardModifier: ViewModifier {
     var highlighted: Bool
     public func body(content: Content) -> some View {
         content
-            .padding(12)
-            .background(highlighted ? Theme.surfaceHigh : Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Theme.line, lineWidth: 1))
+            .padding(14)
+            .background(highlighted ? Theme.surfaceHigh : Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: Theme.shadow, radius: 3, y: 1)
     }
 }
 
 public extension View {
     func evCard(highlighted: Bool = false) -> some View { modifier(CardModifier(highlighted: highlighted)) }
+
+    /// 로열 블루 내비게이션 바 + 흰 제목·뒤로 버튼, 흰 탭 바. 각 화면의 스크롤 뷰에 한 번 붙인다.
+    func evBrandBars() -> some View {
+        self
+            .toolbarBackground(Theme.brand, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(Theme.surface, for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
+    }
+
+    /// 로열 블루 히어로 영역(다음 경기·선수·구단·경기 상단).
+    func evHero() -> some View {
+        self
+            .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: Theme.shadow, radius: 3, y: 1)
+    }
 }
 
 public struct SectionTitle: View {
@@ -70,7 +82,7 @@ public struct SectionTitle: View {
     }
 }
 
-// MARK: - 밑줄 탭 (FM 의 서브 메뉴)
+// MARK: - 밑줄 탭 (서브 메뉴)
 
 public struct FMTabs<Value: Hashable>: View {
     let items: [(Value, String)]
@@ -146,8 +158,8 @@ public struct PlayerPhoto: View {
             case .success(let image): image.resizable().scaledToFill()
             default:
                 ZStack {
-                    LinearGradient(colors: [Color(hex: 0x2B4A86), Color(hex: 0x14213D)], startPoint: .top, endPoint: .bottom)
-                    Text(initials).font(.system(size: size * 0.36, weight: .heavy)).foregroundStyle(Color(hex: 0xCFE3FF))
+                    Theme.heroGradient
+                    Text(initials).font(.system(size: size * 0.36, weight: .heavy)).foregroundStyle(Theme.onBrand)
                 }
             }
         }
@@ -219,7 +231,7 @@ public struct PositionTag: View {
     }
 }
 
-// MARK: - 지표 막대 (FM 속성 줄)
+// MARK: - 지표 막대 (속성 줄)
 
 /// 라벨 · 색이 입혀진 막대 · 숫자. value 는 0...1 로 정규화한 값, detail 은 실제 수치 문구.
 public struct AttributeBar: View {
@@ -276,7 +288,7 @@ public struct StatCompareRow: View {
                 HStack(spacing: 3) {
                     Capsule().fill(Theme.blue)
                         .frame(width: max(proxy.size.width * (grown ? line.home / total : 0.5) - 1.5, 4))
-                    Capsule().fill(Color(hex: 0x6B7790))
+                    Capsule().fill(Theme.draw.opacity(0.45))
                         .frame(width: max(proxy.size.width * (grown ? line.away / total : 0.5) - 1.5, 4))
                 }
             }

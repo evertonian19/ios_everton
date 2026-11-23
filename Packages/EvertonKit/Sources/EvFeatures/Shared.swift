@@ -46,8 +46,8 @@ struct MatchRow: View {
             Text(match.isHome() ? "H" : "A")
                 .font(.system(size: 9, weight: .black))
                 .frame(width: 16, height: 16)
-                .background(match.isHome() ? Color(hex: 0x1D3F73) : Theme.surfaceHigh, in: RoundedRectangle(cornerRadius: 3))
-                .foregroundStyle(match.isHome() ? Color(hex: 0xCFE3FF) : Theme.textSecondary)
+                .background(match.isHome() ? Theme.brand : Theme.surfaceHigh, in: RoundedRectangle(cornerRadius: 3))
+                .foregroundStyle(match.isHome() ? Theme.onBrand : Theme.textSecondary)
             ClubLogo(url: match.opponent().logoURL, size: 22)
             Text(match.opponent().display).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.textPrimary).lineLimit(1)
             Spacer()
@@ -65,7 +65,7 @@ struct MatchRow: View {
     }
 }
 
-/// FM 식 선수 표: 번호 · 포지션 · 이름 · 나이 · 출전 · 골 · 도움. 머리글을 눌러 정렬한다.
+/// 선수 표: 번호 · 포지션 · 이름 · 나이 · 출전 · 골 · 도움. 머리글을 눌러 정렬한다.
 struct RosterTable: View {
     let players: [Player]
 

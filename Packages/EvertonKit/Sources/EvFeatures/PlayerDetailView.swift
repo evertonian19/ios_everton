@@ -25,6 +25,7 @@ struct PlayerDetailView: View {
             .padding(10)
         }
         .background(Theme.background)
+        .evBrandBars()
         .navigationTitle(player.shortName)
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -38,18 +39,17 @@ struct PlayerDetailView: View {
                 HStack(spacing: 6) {
                     PositionTag(player.position)
                     Text("\(player.position.title) · \(player.age.map { "\($0)세" } ?? "-")")
-                        .font(.footnote).foregroundStyle(Color(hex: 0xC9D3E6))
+                        .font(.footnote).foregroundStyle(Theme.onBrand2)
                 }
                 HStack(spacing: 6) {
                     FlagImage(player.flagURL)
-                    Text(player.nationality ?? "-").font(.footnote).foregroundStyle(Color(hex: 0xC9D3E6))
+                    Text(player.nationality ?? "-").font(.footnote).foregroundStyle(Theme.onBrand2)
                 }
             }
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color(hex: 0x2B4A86), lineWidth: 1))
+        .evHero()
     }
 
     // MARK: 개요

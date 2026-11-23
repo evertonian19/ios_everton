@@ -23,6 +23,7 @@ struct LeagueView: View {
                 .padding(10)
             }
             .background(Theme.background)
+            .evBrandBars()
             .navigationTitle("Premier League")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await model.loadStandings(); await model.loadClubs() }

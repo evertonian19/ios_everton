@@ -48,6 +48,7 @@ struct NewsView: View {
                 .padding(16)
             }
             .background(Theme.background)
+            .evBrandBars()
             .navigationTitle("뉴스")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await model.loadNews(); requestTranslation() }

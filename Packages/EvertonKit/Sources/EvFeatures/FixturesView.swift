@@ -50,6 +50,7 @@ struct FixturesView: View {
                 .padding(10)
             }
             .background(Theme.background)
+            .evBrandBars()
             .navigationTitle("일정")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await model.loadMatches() }

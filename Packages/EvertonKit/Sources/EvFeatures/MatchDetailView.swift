@@ -30,6 +30,7 @@ struct MatchDetailView: View {
             .padding(10)
         }
         .background(Theme.background)
+        .evBrandBars()
         .navigationTitle(match.opponent().display)
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -47,13 +48,13 @@ struct MatchDetailView: View {
     private var header: some View {
         VStack(spacing: 8) {
             Text("\(match.competition) · \(Fmt.day(match.kickoff)) \(Fmt.time(match.kickoff))\(match.venue.map { " · \($0)" } ?? "")")
-                .font(.caption).foregroundStyle(Color(hex: 0xC9D3E6))
+                .font(.caption).foregroundStyle(Theme.onBrand2)
             HStack {
                 club(match.home)
                 VStack(spacing: 2) {
                     Text(match.phase == .upcoming ? "VS" : match.scoreText)
                         .font(.system(size: 30, weight: .heavy, design: .rounded)).foregroundStyle(.white)
-                    Text(match.statusText).font(.caption2).foregroundStyle(Color(hex: 0x9FB4D8))
+                    Text(match.statusText).font(.caption2).foregroundStyle(Theme.onBrand2)
                 }
                 .frame(width: 110)
                 club(match.away)
@@ -61,8 +62,7 @@ struct MatchDetailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity)
-        .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color(hex: 0x2B4A86), lineWidth: 1))
+        .evHero()
     }
 
     private func club(_ club: Club) -> some View {

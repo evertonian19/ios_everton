@@ -17,6 +17,7 @@ struct SquadView: View {
                 .padding(10)
             }
             .background(Theme.background)
+            .evBrandBars()
             .navigationTitle("스쿼드")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await model.loadSquad() }

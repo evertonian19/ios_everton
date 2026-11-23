@@ -22,9 +22,9 @@ public struct RootView: View {
             NewsView()
                 .tabItem { Label("뉴스", systemImage: "newspaper.fill") }
         }
-        .tint(Theme.blue)
+        .tint(Theme.brand)
         .environment(model)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
         .task { await model.loadAll() }
     }
 }

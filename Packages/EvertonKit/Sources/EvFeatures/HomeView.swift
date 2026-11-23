@@ -28,6 +28,7 @@ struct HomeView: View {
                 .padding(10)
             }
             .background(Theme.background)
+            .evBrandBars()
             .navigationTitle("Everton")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await model.loadAll() }
@@ -145,11 +146,11 @@ private struct NextMatchPanel: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack {
-                Text("다음 경기 · \(match.competition)").font(.caption.weight(.heavy)).foregroundStyle(Color(hex: 0xB9C4D6))
+                Text("다음 경기 · \(match.competition)").font(.caption.weight(.heavy)).foregroundStyle(Theme.onBrand2)
                 Spacer()
                 Text(match.isHome() ? "홈" : "원정").font(.caption2.weight(.heavy))
                     .padding(.horizontal, 7).padding(.vertical, 2)
-                    .background(match.isHome() ? Theme.gold : Theme.surfaceHigh, in: RoundedRectangle(cornerRadius: 3))
+                    .background(match.isHome() ? Theme.gold : Theme.surfaceHigh, in: RoundedRectangle(cornerRadius: 5))
                     .foregroundStyle(match.isHome() ? Color.black : Theme.textPrimary)
             }
             HStack {
@@ -157,9 +158,9 @@ private struct NextMatchPanel: View {
                 VStack(spacing: 4) {
                     if match.phase == .live {
                         Text(match.scoreText).font(.system(size: 28, weight: .heavy, design: .rounded))
-                        Text("LIVE").font(.caption.weight(.heavy)).foregroundStyle(Theme.loss)
+                        Text("LIVE").font(.caption.weight(.heavy)).foregroundStyle(Color(hex: 0xFF8A8D))
                     } else {
-                        Text("VS").font(.title3.weight(.black)).foregroundStyle(Color(hex: 0x7FA6E8))
+                        Text("VS").font(.title3.weight(.black)).foregroundStyle(Theme.onBrand2)
                         TimelineView(.periodic(from: .now, by: 1)) { context in
                             Text(Fmt.countdown(to: match.kickoff, from: context.date) ?? "곧 시작")
                                 .font(.system(.callout, design: .monospaced).weight(.bold))
@@ -172,12 +173,11 @@ private struct NextMatchPanel: View {
                 team(match.away)
             }
             Text("\(Fmt.day(match.kickoff)) \(Fmt.time(match.kickoff))\(match.venue.map { " · \($0)" } ?? "")")
-                .font(.caption).foregroundStyle(Color(hex: 0xC9D3E6))
+                .font(.caption).foregroundStyle(Theme.onBrand2)
         }
         .padding(12)
-        .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color(hex: 0x2B4A86), lineWidth: 1))
-        .foregroundStyle(Theme.textPrimary)
+        .evHero()
+        .foregroundStyle(Theme.onBrand)
     }
 
     private func team(_ club: Club) -> some View {
