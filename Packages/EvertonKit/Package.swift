@@ -19,3 +19,5 @@ let package = Package(
         .testTarget(name: "EvNetworkingTests", dependencies: ["EvNetworking", "EvCore"]),
     ]
 )
+
+# EvNetworking Tests dependencies
