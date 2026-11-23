@@ -1,48 +1,54 @@
+# Everton
 
-## 화면
+An iOS app for following Everton FC: fixtures, match details, squad, league table, and news, all in one place.
 
-| 탭 | 내용 |
+## Screens
+
+| Tab | Contents |
 |---|---|
-| 홈 | 다음 경기 카운트다운, 순위 요약, 최근 경기, 공격 포인트 TOP |
-| 일정 | 월별 일정, 예정/결과 필터 |
-| 경기 상세 | 통계 비교, 포메이션 라인업, 주요 장면 |
-| 스쿼드 | 선수 표(정렬 가능) → 선수 상세(개요·기록·정보) |
-| 리그 | 순위표, 20개 구단 목록 → 구단 정보·선수 목록 → 선수 상세 |
-| 뉴스 | 한글 번역 기사 목록, 원문 전환 |
+| Home | Next-match countdown, standings summary, recent results, top contributors (goals + assists) |
+| Fixtures | Monthly schedule with Upcoming / Results filters |
+| Match Detail | Stats comparison, formation lineups, key events |
+| Squad | Sortable player table → player detail (Overview · Stats · Info) |
+| League | Standings, list of all 20 clubs → club info and roster → player detail |
+| News | Articles translated into Korean, with a toggle to the original text |
 
-## 디자인
+## Design
 
-에버턴 브랜드 스타일: 로열 블루(#003399) 내비게이션 바·히어로, 밝은 바탕에 그림자만 있는 흰 카드, 파랑은 포인트로만 사용. 색·카드 규격은 `EvDesign/Theme.swift`·`Components.swift` 에 모여 있고, 대시보드의 iOS 메뉴 목업(`public/css/ios.css`)과 같은 토큰을 씁니다.
+Everton brand styling: royal blue (#003399) for the navigation bar and hero, white shadow-only cards on a light background, and blue used only as an accent. Colors and card specs live in `EvDesign/Theme.swift` and `EvDesign/Components.swift`, and use the same design tokens as the iOS menu mockup in the dashboard (`public/css/ios.css`).
 
-## 구조
+## Architecture
 
 ```
-App/                         앱 진입점
+App/                         App entry point
 Packages/EvertonKit/
-  EvCore        모델, 서비스 프로토콜, 포맷, 샘플 데이터
-  EvNetworking  ESPN(기본)·API-Football(선택) 클라이언트, RSS, 디스크 캐시
-  EvDesign      테마, 공용 컴포넌트, 레이더 차트
-  EvFeatures    화면과 상태 관리
-Config/         API 키 설정 예시
+  EvCore        Models, service protocols, formatting, sample data
+  EvNetworking  ESPN (default) and API-Football (optional) clients, RSS, disk cache
+  EvDesign      Theme, shared components, radar chart
+  EvFeatures    Screens and state management
+Config/         Example API key configuration
 ```
 
-## 실행
+## Getting Started
 
-1. Xcode 에서 **iOS App** 프로젝트 생성 (Interface: SwiftUI, 이름 `Everton`, 최소 iOS 18).
-2. 기본 `ContentView` 와 `@main` 파일을 지우고 `App/EvertonApp.swift` 를 추가.
-3. **File > Add Package Dependencies > Add Local…** 에서 `Packages/EvertonKit` 을 추가하고 앱 타깃에 `EvFeatures` 연결.
-4. API 키 설정 (선택)
-   - `Config/Secrets.example.xcconfig` 를 `Config/Secrets.xcconfig` 로 복사하고 키 입력
-   - 프로젝트 Info > Configurations 에서 Debug/Release 에 이 파일 지정
-   - 앱 타깃 Info 에 `API_FOOTBALL_KEY` = `$(API_FOOTBALL_KEY)` 추가
-5. 서명 팀을 선택하고 기기에서 실행.
+1. In Xcode, create a new **iOS App** project (Interface: SwiftUI, Product Name: `Everton`, minimum deployment target: iOS 18).
+2. Delete the default `ContentView` and `@main` files, then add `App/EvertonApp.swift`.
+3. Go to **File > Add Package Dependencies > Add Local…**, select `Packages/EvertonKit`, and link `EvFeatures` to the app target.
+4. (Optional) Configure the API key:
+   - Copy `Config/Secrets.example.xcconfig` to `Config/Secrets.xcconfig` and fill in your key.
+   - In the project's Info > Configurations, assign this file to both Debug and Release.
+   - In the app target's Info, add `API_FOOTBALL_KEY` = `$(API_FOOTBALL_KEY)`.
+5. Select your signing team and run on a device.
 
-## 데이터 출처
+## Data Sources
 
-- **기본: ESPN 공개 API** (키 불필요) — 2026-27 일정·스쿼드·순위·경기 요약(통계·라인업·주요 장면).
-- **선택: API-Football** — 키를 넣으면 자동 전환(사진·평점 포함).
-- ESPN 은 선수 평점·사진·패스/태클 지표·창단연도·수용 인원을 주지 않습니다. 이 값들은 임의로 채우지 않고,
-  지표(강점·레이더)는 골·도움·슈팅·카드·선방 같은 실제 기록을 출전당으로 환산해 계산합니다.
-- 비공식 API 이므로 응답을 디스크에 캐시하고, 네트워크 실패 시 오래된 캐시를 보여 줍니다.
+- **Default: ESPN public API** (no key required). Provides the 2026-27 fixtures, squads, standings, and match summaries (stats, lineups, key events).
+- **Optional: API-Football.** Add a key and the app switches to it automatically (adds player photos and ratings).
+- ESPN does not provide player ratings, photos, passing/tackling metrics, founding year, or stadium capacity. These values are never filled in with made-up data. Derived metrics (strengths, radar chart) are computed from real recorded stats such as goals, assists, shots, cards, and saves, normalized per appearance.
+- Because these are unofficial APIs, responses are cached on disk, and stale cache is shown if the network request fails.
 
-테스트: `cd Packages/EvertonKit && swift test`
+## Testing
+
+```bash
+cd Packages/EvertonKit && swift test
+```
