@@ -56,6 +56,8 @@ public final class AppModel {
     public var clubs: LoadState<[ClubInfo]> = .idle
     /// 구단별 스쿼드(리그 탭에서 구단을 열 때 불러온다). 키는 구단 ID.
     public var rosters: [Int: LoadState<[Player]>] = [:]
+    /// 구단별 베스트 11·전술(스쿼드 화면을 열 때 불러온다). 키는 구단 ID.
+    public var tactics: [Int: LoadState<TeamTactics>] = [:]
 
     public init(services: AppServices) {
         self.services = services
@@ -108,6 +110,18 @@ public final class AppModel {
     public func reloadRoster(_ clubID: Int) async {
         rosters[clubID] = nil
         await loadRoster(clubID)
+    }
+
+    public func reloadTactics(_ clubID: Int) async {
+        tactics[clubID] = nil
+        await loadTactics(clubID)
+    }
+
+    public func loadTactics(_ clubID: Int) async {
+        if tactics[clubID]?.value != nil { return }
+        tactics[clubID] = .loading
+        do { tactics[clubID] = .loaded(try await services.football.tactics(of: clubID)) }
+        catch { tactics[clubID] = .failed(error.localizedDescription) }
     }
 
     public func loadRoster(_ clubID: Int) async {

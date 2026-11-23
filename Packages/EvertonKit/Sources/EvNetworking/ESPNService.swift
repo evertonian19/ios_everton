@@ -99,6 +99,28 @@ public struct ESPNService: FootballService {
         ESPNMapping.standings(try await fetch("\(v2)/standings", ttl: TTL.standings, as: ESPNStandings.self))
     }
 
+    /// 최근 리그 5경기의 선발 명단·경기 통계로 베스트 11 과 전술 요약을 만든다 (경기 요약은 하루 캐시).
+    public func tactics(of clubID: Int) async throws -> TeamTactics {
+        let base = "\(site)/teams/\(clubID)/schedule"
+        async let past = fetch(base, ttl: TTL.schedule, as: ESPNSchedule.self)
+        async let upcoming = fetch(base + "?fixture=true", ttl: TTL.schedule, as: ESPNSchedule.self)
+        let played = ESPNMapping.schedule(try await [past, upcoming]).recentResults(Tactics.matchCount)
+        var samples: [TeamSample] = []
+        for match in played {
+            guard let detail = try? await self.detail(of: match),
+                  let lineup = detail.lineups.first(where: { $0.club.id == clubID }) else { continue }
+            let isHome = match.home.id == clubID
+            var stats: [String: Double] = [:]
+            for line in detail.stats { stats[line.label] = isHome ? line.home : line.away }
+            samples.append(TeamSample(matchID: match.id, opponent: match.opponent(of: clubID).display,
+                                      formation: lineup.formation, starters: lineup.starters,
+                                      goalsFor: (isHome ? match.homeGoals : match.awayGoals) ?? 0,
+                                      goalsAgainst: (isHome ? match.awayGoals : match.homeGoals) ?? 0, stats: stats))
+        }
+        guard !samples.isEmpty else { throw ServiceError.server("최근 경기 라인업을 찾지 못했어요.") }
+        return Tactics.make(samples)
+    }
+
     /// 시즌·일정·스쿼드가 기대(2026-27)와 맞는지 새로 확인한다.
     public func diagnostics() async -> DataReport {
         var report = DataReport(source: "ESPN 공개 API",

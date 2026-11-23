@@ -67,7 +67,7 @@ private struct PitchPlayerView: View {
     }
 }
 
-private struct PitchBackground: View {
+struct PitchBackground: View {
     var body: some View {
         GeometryReader { proxy in
             let w = proxy.size.width

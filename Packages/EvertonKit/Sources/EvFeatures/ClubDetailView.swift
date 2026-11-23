@@ -15,7 +15,7 @@ struct ClubDetailView: View {
             VStack(spacing: 10) {
                 header
                 LoadStateView(state: roster, retry: { await model.loadRoster(club.id) }) { players in
-                    FMPanel("스쿼드 · \(players.count)명") { RosterTable(players: players) }
+                    TeamSquadSection(clubID: club.id, players: players)
                 }
                 SourceFooter()
             }
@@ -26,7 +26,10 @@ struct ClubDetailView: View {
         .navigationTitle(club.display)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.loadRoster(club.id) }
-        .refreshable { await model.reloadRoster(club.id) }
+        .refreshable {
+            await model.reloadRoster(club.id)
+            await model.reloadTactics(club.id)
+        }
     }
 
     private var header: some View {

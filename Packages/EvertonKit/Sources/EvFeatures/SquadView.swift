@@ -10,7 +10,7 @@ struct SquadView: View {
             ScrollView {
                 VStack(spacing: 10) {
                     LoadStateView(state: model.squad, retry: { await model.loadSquad() }) { players in
-                        FMPanel("1군 스쿼드 · \(players.count)명") { RosterTable(players: players) }
+                        TeamSquadSection(clubID: model.services.football.homeTeamID, players: players)
                     }
                     SourceFooter()
                 }
@@ -20,7 +20,10 @@ struct SquadView: View {
             .evBrandBars()
             .navigationTitle("스쿼드")
             .navigationBarTitleDisplayMode(.inline)
-            .refreshable { await model.loadSquad() }
+            .refreshable {
+                await model.loadSquad()
+                await model.reloadTactics(model.services.football.homeTeamID)
+            }
             .navigationDestination(for: Player.self) { PlayerDetailView(player: $0) }
         }
     }
