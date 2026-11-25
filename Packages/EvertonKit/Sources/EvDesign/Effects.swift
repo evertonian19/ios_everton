@@ -104,11 +104,9 @@ struct HeroModifier: ViewModifier {
                 ZStack {
                     palette.gradient
                     RadialGradient(colors: [palette.glow.opacity(0.28), .clear], center: .topTrailing, startRadius: 0, endRadius: 240)
-                    StadiumLights(palette: palette)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            .overlay { FoilBorder(color: palette.glow, cornerRadius: 14) }
             .shadow(color: palette.main.opacity(0.45), radius: 12, y: 4)
     }
 }

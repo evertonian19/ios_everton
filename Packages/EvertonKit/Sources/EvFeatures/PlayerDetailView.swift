@@ -30,6 +30,7 @@ struct PlayerDetailView: View {
         .evBrandBars(tint: palette.main)
         .navigationTitle(player.shortName)
         .navigationBarTitleDisplayMode(.inline)
+        .task { await model.loadRatings(for: player) }
     }
 
     private struct HeroChip: Identifiable {
@@ -71,6 +72,16 @@ struct PlayerDetailView: View {
                     }
                 }
                 Spacer(minLength: 0)
+                if let ea = model.ratings[player.id]?.value ?? nil {
+                    VStack(spacing: 0) {
+                        Text("\(ea.overall)").font(.system(size: 26, weight: .heavy, design: .rounded)).foregroundStyle(.white)
+                        Text("EA").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+                    }
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .background(Color.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.3), lineWidth: 1))
+                    .accessibilityLabel("EA 종합 \(ea.overall)")
+                }
             }
             if !heroChips.isEmpty {
                 HStack(spacing: 8) {
@@ -78,7 +89,6 @@ struct PlayerDetailView: View {
                         StatTile(value: chip.value, label: chip.label, icon: chip.icon, highlight: chip.highlight)
                     }
                 }
-                if player.position != .goalkeeper, let goals = stats?.goals { GoalPips(goals) }
             }
         }
         .padding(12)
@@ -99,6 +109,7 @@ struct PlayerDetailView: View {
 
     @ViewBuilder
     private var overview: some View {
+        PlayerRatingsSection(player: player)
         let metrics = PlayerMetrics.radar(for: player, teamGames: model.teamGames)
         let strengths = PlayerMetrics.strengths(for: player, teamGames: model.teamGames)
         if !strengths.isEmpty {

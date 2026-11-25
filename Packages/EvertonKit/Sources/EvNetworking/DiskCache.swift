@@ -27,6 +27,11 @@ public actor DiskCache {
         return data
     }
 
+    /// 저장된 시각(없으면 nil).
+    public func savedAt(for key: String) -> Date? {
+        (try? fileManager.attributesOfItem(atPath: fileURL(key).path))?[.modificationDate] as? Date
+    }
+
     public func store(_ data: Data, for key: String) {
         try? data.write(to: fileURL(key), options: .atomic)
     }

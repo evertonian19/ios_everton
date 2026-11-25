@@ -59,6 +59,9 @@ public final class AppModel {
     public var rosters: [Int: LoadState<[Player]>] = [:]
     /// 구단별 베스트 11·전술(스쿼드 화면을 열 때 불러온다). 키는 구단 ID.
     public var tactics: [Int: LoadState<TeamTactics>] = [:]
+    /// 선수별 EA 평가(선수 화면을 열 때 불러온다). 값이 nil 이면 '평가 없음'(확실히 매칭된 경우만 값이 있다).
+    public var ratings: [Int: LoadState<PlayerRatings?>] = [:]
+    private let eafc = EAFCRatings()
 
     public init(services: AppServices) {
         self.services = services
@@ -130,6 +133,17 @@ public final class AppModel {
         rosters[clubID] = .loading
         do { rosters[clubID] = .loaded(try await services.football.squad(of: clubID)) }
         catch { rosters[clubID] = .failed(error.localizedDescription) }
+    }
+}
+
+// MARK: - EA 평가
+
+extension AppModel {
+    func loadRatings(for player: Player) async {
+        if ratings[player.id]?.value != nil { return }
+        if services.isSample { ratings[player.id] = .loaded(nil); return }
+        ratings[player.id] = .loading
+        ratings[player.id] = .loaded(await eafc.rating(for: player))
     }
 }
 
