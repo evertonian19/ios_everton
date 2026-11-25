@@ -25,6 +25,8 @@ public struct RadarShape: Shape {
 public struct RadarChart: View {
     let labels: [String]
     let values: [Double]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var grown = false
 
     public init(labels: [String], values: [Double]) {
         self.labels = labels
@@ -46,10 +48,19 @@ public struct RadarChart: View {
                     RadarShape(values: Array(repeating: ring, count: max(labels.count, 3)))
                         .stroke(Theme.line.opacity(0.7), lineWidth: 1)
                 }
-                RadarShape(values: values)
-                    .fill(Theme.blue.opacity(0.35))
-                RadarShape(values: values)
-                    .stroke(Theme.blue, style: StrokeStyle(lineWidth: 2, lineJoin: .round))
+                ZStack {
+                    RadarShape(values: values)
+                        .fill(LinearGradient(colors: [Theme.blue.opacity(0.55), Theme.gold.opacity(0.25)], startPoint: .top, endPoint: .bottom))
+                    RadarShape(values: values)
+                        .stroke(Theme.blue, style: StrokeStyle(lineWidth: 2, lineJoin: .round))
+                    ForEach(values.indices, id: \.self) { index in
+                        Circle().fill(Theme.gold).frame(width: 7, height: 7)
+                            .shadow(color: Theme.gold.opacity(0.9), radius: 4)
+                            .position(point(index, scale: CGFloat(min(max(values[index], 0.04), 1)), in: size))
+                    }
+                }
+                .scaleEffect(grown ? 1 : 0.05)
+                .opacity(grown ? 1 : 0)
                 ForEach(labels.indices, id: \.self) { index in
                     Text(labels[index])
                         .font(.caption2.weight(.semibold))
@@ -60,5 +71,8 @@ public struct RadarChart: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .padding(24)
+        .onAppear {
+            if reduceMotion { grown = true } else { withAnimation(.spring(duration: 0.9, bounce: 0.25)) { grown = true } }
+        }
     }
 }

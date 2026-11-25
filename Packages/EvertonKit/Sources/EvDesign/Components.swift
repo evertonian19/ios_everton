@@ -58,7 +58,17 @@ public extension View {
     /// 로열 블루 히어로 영역(다음 경기·선수·구단·경기 상단).
     func evHero() -> some View {
         self
-            .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background {
+                ZStack {
+                    Theme.stadiumGradient
+                    StadiumLights()
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(LinearGradient(colors: [Theme.gold.opacity(0.7), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
+            )
             .shadow(color: Theme.shadow, radius: 3, y: 1)
     }
 }
@@ -87,6 +97,7 @@ public struct SectionTitle: View {
 public struct FMTabs<Value: Hashable>: View {
     let items: [(Value, String)]
     @Binding var selection: Value
+    @Namespace private var underline
 
     public init(_ items: [(Value, String)], selection: Binding<Value>) {
         self.items = items
@@ -102,7 +113,12 @@ public struct FMTabs<Value: Hashable>: View {
                         Text(item.1)
                             .font(.footnote.weight(.bold))
                             .foregroundStyle(selection == item.0 ? Theme.textPrimary : Theme.textSecondary)
-                        Rectangle().fill(selection == item.0 ? Theme.blue : .clear).frame(height: 2)
+                        ZStack {
+                            Rectangle().fill(Color.clear).frame(height: 2)
+                            if selection == item.0 {
+                                Rectangle().fill(Theme.blue).frame(height: 2).matchedGeometryEffect(id: "tab-underline", in: underline)
+                            }
+                        }
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -111,6 +127,7 @@ public struct FMTabs<Value: Hashable>: View {
         }
         .padding(.top, 6)
         .overlay(alignment: .bottom) { Divider().overlay(Theme.line) }
+        .sensoryFeedback(.selection, trigger: selection)
     }
 }
 
@@ -141,11 +158,13 @@ public struct PlayerPhoto: View {
     let url: URL?
     let name: String
     let size: CGFloat
+    let ringed: Bool
 
-    public init(url: URL?, name: String, size: CGFloat = 64) {
+    public init(url: URL?, name: String, size: CGFloat = 64, ringed: Bool = false) {
         self.url = url
         self.name = name
         self.size = size
+        self.ringed = ringed
     }
 
     private var initials: String {
@@ -165,6 +184,13 @@ public struct PlayerPhoto: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: size * 0.14, style: .continuous))
+        .overlay {
+            if ringed {
+                RoundedRectangle(cornerRadius: size * 0.14, style: .continuous)
+                    .strokeBorder(LinearGradient(colors: [Theme.gold, Color.white.opacity(0.85), Theme.gold], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2.5)
+            }
+        }
+        .evGlow(Theme.gold, active: ringed)
     }
 }
 
@@ -228,6 +254,7 @@ public struct PositionTag: View {
             .padding(.horizontal, 4).padding(.vertical, 1.5)
             .frame(minWidth: 24)
             .background(Theme.positionColor(position.short), in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+            .shadow(color: Theme.positionColor(position.short).opacity(0.55), radius: 4)
     }
 }
 
@@ -253,7 +280,13 @@ public struct AttributeBar: View {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Theme.surfaceHigh)
-                    Capsule().fill(color).frame(width: max(proxy.size.width * (grown ? value : 0), 4))
+                    Capsule()
+                        .fill(LinearGradient(colors: [color.opacity(0.65), color], startPoint: .leading, endPoint: .trailing))
+                        .frame(width: max(proxy.size.width * (grown ? value : 0), 4))
+                        .overlay(alignment: .trailing) {
+                            Circle().fill(Color.white).frame(width: 4, height: 4).padding(.trailing, 1)
+                                .shadow(color: color, radius: 3).opacity(grown ? 1 : 0)
+                        }
                 }
             }
             .frame(height: 6)

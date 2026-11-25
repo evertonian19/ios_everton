@@ -30,25 +30,65 @@ struct PlayerDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    private struct HeroChip: Identifiable {
+        let label: String
+        let value: Int
+        let icon: String?
+        let highlight: Bool
+        var id: String { label }
+    }
+
+    /// 히어로 아래 기록 칩. 데이터에 있는 실제 기록만 쓴다(평점 같은 가짜 점수는 만들지 않는다).
+    private var heroChips: [HeroChip] {
+        guard let s = stats else { return [] }
+        if player.position == .goalkeeper {
+            return [HeroChip(label: "출전", value: s.appearances, icon: nil, highlight: false),
+                    HeroChip(label: "선방", value: s.saves, icon: "hand.raised.fill", highlight: s.saves > 0),
+                    HeroChip(label: "실점", value: s.conceded, icon: nil, highlight: false)]
+        }
+        return [HeroChip(label: "출전", value: s.appearances, icon: nil, highlight: false),
+                HeroChip(label: "골", value: s.goals, icon: "soccerball", highlight: s.goals > 0),
+                HeroChip(label: "도움", value: s.assists, icon: "arrow.turn.up.right", highlight: s.assists > 0)]
+    }
+
     private var hero: some View {
-        HStack(spacing: 14) {
-            PlayerPhoto(url: player.photoURL, name: player.name, size: 74)
-            VStack(alignment: .leading, spacing: 5) {
-                Text("\(player.number.map { "#\($0) " } ?? "")\(player.name)")
-                    .font(.headline.weight(.bold)).foregroundStyle(.white)
-                HStack(spacing: 6) {
-                    PositionTag(player.position)
-                    Text("\(player.position.title) · \(player.age.map { "\($0)세" } ?? "-")")
-                        .font(.footnote).foregroundStyle(Theme.onBrand2)
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
+                PlayerPhoto(url: player.photoURL, name: player.name, size: 84, ringed: true)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("\(player.number.map { "#\($0) " } ?? "")\(player.name)")
+                        .font(.headline.weight(.bold)).foregroundStyle(.white)
+                    HStack(spacing: 6) {
+                        PositionTag(player.position)
+                        Text("\(player.position.title) · \(player.age.map { "\($0)세" } ?? "-")")
+                            .font(.footnote).foregroundStyle(Theme.onBrand2)
+                    }
+                    HStack(spacing: 6) {
+                        FlagImage(player.flagURL)
+                        Text(player.nationality ?? "-").font(.footnote).foregroundStyle(Theme.onBrand2)
+                    }
                 }
-                HStack(spacing: 6) {
-                    FlagImage(player.flagURL)
-                    Text(player.nationality ?? "-").font(.footnote).foregroundStyle(Theme.onBrand2)
+                Spacer(minLength: 0)
+            }
+            if !heroChips.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(heroChips) { chip in
+                        StatTile(value: chip.value, label: chip.label, icon: chip.icon, highlight: chip.highlight)
+                    }
                 }
             }
-            Spacer(minLength: 0)
         }
         .padding(12)
+        .background(alignment: .trailing) {
+            if let number = player.number {
+                Text("\(number)")
+                    .font(.system(size: 120, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.07))
+                    .offset(x: 14, y: -10)
+                    .accessibilityHidden(true)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .evHero()
     }
 
@@ -65,10 +105,12 @@ struct PlayerDetailView: View {
                         Text(item).font(.footnote.weight(.bold)).foregroundStyle(Color.black.opacity(0.85))
                             .padding(.horizontal, 10).padding(.vertical, 4)
                             .background(Theme.gold, in: Capsule())
+                            .evShimmer()
                     }
                     Spacer()
                 }
             }
+            .evRise()
         }
         if metrics.isEmpty {
             FMPanel("시즌 지표") {
@@ -87,6 +129,7 @@ struct PlayerDetailView: View {
                         .font(.caption2).foregroundStyle(Theme.textSecondary)
                 }
             }
+            .evRise(delay: 0.1)
         }
     }
 
@@ -110,14 +153,23 @@ struct PlayerDetailView: View {
         } else {
             FMPanel("시즌 기록") {
                 VStack(spacing: 0) {
-                    ForEach(rows, id: \.0) { row in
-                        HStack {
-                            Text(row.0).font(.footnote).foregroundStyle(Theme.textSecondary)
-                            Spacer()
-                            Text("\(row.1)").font(.subheadline.weight(.heavy)).foregroundStyle(Theme.textPrimary)
-                            Text(perGame(row.1)).font(.caption2).foregroundStyle(Theme.textSecondary).frame(width: 64, alignment: .trailing)
+                    ForEach(Array(rows.enumerated()), id: \.element.0) { index, row in
+                        let star = Self.starRows.contains(row.0) && row.1 > 0
+                        VStack(spacing: 4) {
+                            HStack(spacing: 6) {
+                                if star, let icon = Self.rowIcon[row.0] {
+                                    Image(systemName: icon).font(.caption.weight(.bold)).foregroundStyle(Theme.gold)
+                                }
+                                Text(row.0).font(.footnote).foregroundStyle(star ? Theme.textPrimary : Theme.textSecondary)
+                                Spacer()
+                                CountUpText(row.1).font(.subheadline.weight(.heavy))
+                                    .foregroundStyle(star ? Theme.gold : Theme.textPrimary)
+                                Text(perGame(row.1)).font(.caption2).foregroundStyle(Theme.textSecondary).frame(width: 64, alignment: .trailing)
+                            }
+                            RecordBar(fraction: barMax > 0 ? Double(row.1) / Double(barMax) : 0, tint: star ? Theme.gold : Theme.blue)
                         }
                         .padding(.vertical, 6)
+                        .evRise(delay: Double(index) * 0.04)
                         Divider().overlay(Theme.line.opacity(0.5))
                     }
                     Text("출처: ESPN 시즌 누적 기록(비공식 API). 경기 이벤트와의 대조 검증은 에버턴 선수만 수행합니다.")
@@ -126,6 +178,14 @@ struct PlayerDetailView: View {
                 }
             }
         }
+    }
+
+    private static let starRows: Set<String> = ["골", "도움", "선방"]
+    private static let rowIcon = ["골": "soccerball", "도움": "arrow.turn.up.right", "선방": "hand.raised.fill"]
+
+    /// 막대 길이의 기준: 출전·교체 투입을 뺀 기록 중 가장 큰 값.
+    private var barMax: Int {
+        rows.filter { $0.0 != "출전" && $0.0 != "교체 투입" }.map(\.1).max() ?? 0
     }
 
     private func perGame(_ value: Int) -> String {
@@ -205,6 +265,29 @@ struct PlayerDetailView: View {
             }
             .padding(.vertical, 7)
             Divider().overlay(Theme.line.opacity(0.5))
+        }
+    }
+}
+
+/// 시즌 기록 행 밑의 가는 막대. 나타날 때 왼쪽에서 채워진다.
+private struct RecordBar: View {
+    let fraction: Double
+    let tint: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var grown = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.surfaceHigh)
+                Capsule()
+                    .fill(LinearGradient(colors: [tint.opacity(0.55), tint], startPoint: .leading, endPoint: .trailing))
+                    .frame(width: max(proxy.size.width * (grown ? min(max(fraction, 0), 1) : 0), fraction > 0 ? 3 : 0))
+            }
+        }
+        .frame(height: 3)
+        .onAppear {
+            if reduceMotion { grown = true } else { withAnimation(.easeOut(duration: 0.7).delay(0.15)) { grown = true } }
         }
     }
 }

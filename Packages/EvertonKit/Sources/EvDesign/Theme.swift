@@ -38,6 +38,11 @@ public enum Theme {
     public static let heroGradient = LinearGradient(
         colors: [brand, brandDeep], startPoint: .topLeading, endPoint: .bottomTrailing)
 
+    /// 스타디움 야간 조명 느낌의 히어로 배경 (위쪽이 밝고 아래로 어두워진다).
+    public static let stadiumGradient = LinearGradient(
+        colors: [Color(hex: 0x0A2E8A), brand, brandDeep, Color(hex: 0x000F36)],
+        startPoint: .top, endPoint: .bottom)
+
     /// 포지션 배지 색 (포지션 그룹마다 고정 색).
     public static func positionColor(_ position: String) -> Color {
         switch position {

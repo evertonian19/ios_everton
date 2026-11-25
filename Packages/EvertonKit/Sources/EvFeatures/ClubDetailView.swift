@@ -33,12 +33,20 @@ struct ClubDetailView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 8) {
-            ClubLogo(url: club.logoURL, size: 64)
+        VStack(spacing: 10) {
+            ClubLogo(url: club.logoURL, size: 72)
+                .padding(8)
+                .background(Color.white.opacity(0.10), in: Circle())
+                .evGlow(.white, active: true)
             Text(club.name).font(.title3.weight(.bold)).foregroundStyle(.white)
             if let standing {
-                Text("\(standing.rank)위 · 승점 \(standing.points) · \(standing.won)승 \(standing.drawn)무 \(standing.lost)패")
-                    .font(.footnote).foregroundStyle(Theme.onBrand2)
+                HStack(spacing: 6) {
+                    StatTile(value: standing.rank, label: "순위", highlight: standing.rank == 1, compact: true)
+                    StatTile(value: standing.points, label: "승점", compact: true)
+                    StatTile(value: standing.won, label: "승", compact: true)
+                    StatTile(value: standing.drawn, label: "무", compact: true)
+                    StatTile(value: standing.lost, label: "패", compact: true)
+                }
             }
         }
         .padding(14)
