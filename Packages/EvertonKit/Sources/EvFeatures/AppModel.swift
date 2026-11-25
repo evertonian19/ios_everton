@@ -1,6 +1,7 @@
 import SwiftUI
 import Observation
 import EvCore
+import EvDesign
 import EvNetworking
 
 public enum LoadState<Value> {
@@ -129,5 +130,24 @@ public final class AppModel {
         rosters[clubID] = .loading
         do { rosters[clubID] = .loaded(try await services.football.squad(of: clubID)) }
         catch { rosters[clubID] = .failed(error.localizedDescription) }
+    }
+}
+
+// MARK: - 구단 색 찾기
+
+extension AppModel {
+    /// 구단 ID 로 팀 색을 찾는다. 구단 목록·순위표의 `code` 를 쓰고, 못 찾으면 에버턴 색.
+    func palette(forClub id: Int) -> TeamPalette {
+        if let code = clubs.value?.first(where: { $0.club.id == id })?.club.code { return .of(code: code) }
+        if let code = standings.value?.first(where: { $0.club.id == id })?.club.code { return .of(code: code) }
+        return .everton
+    }
+
+    /// 선수가 속한 구단의 팀 색. 불러온 스쿼드에서 찾고, 에버턴 스쿼드에 있으면 에버턴 색.
+    func palette(forPlayer playerID: Int) -> TeamPalette {
+        for (clubID, state) in rosters where state.value?.contains(where: { $0.id == playerID }) == true {
+            return palette(forClub: clubID)
+        }
+        return .everton
     }
 }

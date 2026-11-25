@@ -46,9 +46,9 @@ public extension View {
     func evCard(highlighted: Bool = false) -> some View { modifier(CardModifier(highlighted: highlighted)) }
 
     /// 로열 블루 내비게이션 바 + 흰 제목·뒤로 버튼, 흰 탭 바. 각 화면의 스크롤 뷰에 한 번 붙인다.
-    func evBrandBars() -> some View {
+    func evBrandBars(tint: Color = Theme.brand) -> some View {
         self
-            .toolbarBackground(Theme.brand, for: .navigationBar)
+            .toolbarBackground(tint, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbarBackground(Theme.surface, for: .tabBar)
@@ -56,21 +56,7 @@ public extension View {
     }
 
     /// 로열 블루 히어로 영역(다음 경기·선수·구단·경기 상단).
-    func evHero() -> some View {
-        self
-            .background {
-                ZStack {
-                    Theme.stadiumGradient
-                    StadiumLights()
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: [Theme.gold.opacity(0.7), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
-            )
-            .shadow(color: Theme.shadow, radius: 3, y: 1)
-    }
+    func evHero() -> some View { modifier(HeroModifier()) }
 }
 
 public struct SectionTitle: View {
@@ -98,6 +84,7 @@ public struct FMTabs<Value: Hashable>: View {
     let items: [(Value, String)]
     @Binding var selection: Value
     @Namespace private var underline
+    @Environment(\.teamPalette) private var palette
 
     public init(_ items: [(Value, String)], selection: Binding<Value>) {
         self.items = items
@@ -116,7 +103,7 @@ public struct FMTabs<Value: Hashable>: View {
                         ZStack {
                             Rectangle().fill(Color.clear).frame(height: 2)
                             if selection == item.0 {
-                                Rectangle().fill(Theme.blue).frame(height: 2).matchedGeometryEffect(id: "tab-underline", in: underline)
+                                Rectangle().fill(palette.main).frame(height: 2).matchedGeometryEffect(id: "tab-underline", in: underline)
                             }
                         }
                     }
@@ -159,6 +146,7 @@ public struct PlayerPhoto: View {
     let name: String
     let size: CGFloat
     let ringed: Bool
+    @Environment(\.teamPalette) private var palette
 
     public init(url: URL?, name: String, size: CGFloat = 64, ringed: Bool = false) {
         self.url = url
@@ -187,10 +175,10 @@ public struct PlayerPhoto: View {
         .overlay {
             if ringed {
                 RoundedRectangle(cornerRadius: size * 0.14, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: [Theme.gold, Color.white.opacity(0.85), Theme.gold], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2.5)
+                    .strokeBorder(LinearGradient(colors: [palette.glow, Color.white.opacity(0.85), palette.glow], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2.5)
             }
         }
-        .evGlow(Theme.gold, active: ringed)
+        .evGlow(palette.glow, active: ringed)
     }
 }
 
@@ -327,6 +315,60 @@ public struct StatCompareRow: View {
             }
             .frame(height: 5)
             .onAppear { withAnimation(.spring(duration: 0.7)) { grown = true } }
+        }
+    }
+}
+
+// MARK: - 피치 선수 토큰 (팀 색 방패)
+
+struct ShieldShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let r: CGFloat = 8
+        path.move(to: CGPoint(x: rect.minX + r, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + r), control: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY + 2))
+        path.addQuadCurve(to: CGPoint(x: rect.midX, y: rect.maxY), control: CGPoint(x: rect.maxX, y: rect.maxY - 4))
+        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.midY + 2), control: CGPoint(x: rect.minX, y: rect.maxY - 4))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
+        path.addQuadCurve(to: CGPoint(x: rect.minX + r, y: rect.minY), control: CGPoint(x: rect.minX, y: rect.minY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// 피치 위 선수 표시: 팀 색 그라데이션 방패 + 발광 테두리 + 등번호. `star` 면 금색 오라와 왕관(팀 득점 1위).
+public struct PitchToken: View {
+    let number: Int?
+    let star: Bool
+    @Environment(\.teamPalette) private var palette
+
+    public init(number: Int?, star: Bool = false) {
+        self.number = number
+        self.star = star
+    }
+
+    private var ring: Color { star ? Color(hex: 0xFFD84A) : palette.glow }
+
+    public var body: some View {
+        ZStack(alignment: .top) {
+            Text(number.map(String.init) ?? "")
+                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.white)
+                .shadow(color: Color.black.opacity(0.5), radius: 1, y: 1)
+                .frame(width: 30, height: 34)
+                .background(ShieldShape().fill(LinearGradient(colors: [palette.light, palette.main, palette.deep], startPoint: .top, endPoint: .bottom)))
+                .overlay(ShieldShape().stroke(ring, lineWidth: star ? 2.5 : 2))
+                .shadow(color: ring.opacity(0.7), radius: star ? 10 : 6)
+                .evGlow(Color(hex: 0xFFD84A), active: star)
+            if star {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color(hex: 0xFFD84A))
+                    .shadow(color: Color(hex: 0xFFD84A), radius: 4)
+                    .offset(y: -12)
+            }
         }
     }
 }

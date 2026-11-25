@@ -31,9 +31,11 @@ struct PitchLineupView: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                PitchBackground()
+                PitchBackground(palette: .of(lineup.club))
                 ForEach(placed) { item in
                     PitchPlayerView(player: item.player)
+                        .environment(\.teamPalette, .of(lineup.club))
+                        .evDrop(delay: Double(item.row - 1) * 0.2)
                         .position(
                             x: proxy.size.width * CGFloat(item.col) / CGFloat(item.colCount + 1),
                             y: proxy.size.height * (1 - (CGFloat(item.row) - 0.5) / CGFloat(item.rowCount)))
@@ -51,16 +53,12 @@ private struct PitchPlayerView: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            Text(player.number.map(String.init) ?? "")
-                .font(.system(size: 13, weight: .heavy))
-                .foregroundStyle(Color(hex: 0x0B1220))
-                .frame(width: 28, height: 28)
-                .background(.white, in: Circle())
+            PitchToken(number: player.number)
             Text(player.shortName)
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 5).padding(.vertical, 1)
-                .background(.black.opacity(0.45), in: Capsule())
+                .background(LinearGradient(colors: [.black.opacity(0.1), .black.opacity(0.7), .black.opacity(0.1)], startPoint: .leading, endPoint: .trailing), in: Capsule())
                 .lineLimit(1)
         }
         .frame(width: 70)
@@ -68,12 +66,15 @@ private struct PitchPlayerView: View {
 }
 
 struct PitchBackground: View {
+    var palette: TeamPalette = .everton
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         GeometryReader { proxy in
             let w = proxy.size.width
             let h = proxy.size.height
             ZStack {
-                LinearGradient(colors: [Color(hex: 0x1C6B3A), Color(hex: 0x15532E)], startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: [Color(hex: 0x1F7343), Color(hex: 0x123F25)], startPoint: .top, endPoint: .bottom)
                 // 잔디 줄무늬
                 VStack(spacing: 0) {
                     ForEach(0..<8, id: \.self) { index in
@@ -93,8 +94,31 @@ struct PitchBackground: View {
                     path.addRect(CGRect(x: w * 0.36, y: inset, width: w * 0.28, height: h * 0.06))
                     path.addRect(CGRect(x: w * 0.36, y: h - inset - h * 0.06, width: w * 0.28, height: h * 0.06))
                 }
+
                 .stroke(Color.white.opacity(0.35), lineWidth: 1.5)
+                // 센터 서클이 숨 쉬듯 빛난다
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
+                    let pulse = reduceMotion ? 0.5 : (sin(context.date.timeIntervalSinceReferenceDate * 2.1) + 1) / 2
+                    Circle()
+                        .stroke(palette.glow.opacity(0.25 + 0.5 * pulse), lineWidth: 2)
+                        .frame(width: 68, height: 68)
+                        .shadow(color: palette.glow.opacity(pulse), radius: 12)
+                        .position(x: w / 2, y: h / 2)
+                }
+                StadiumLights(palette: palette, sparks: false, aurora: false)
+                // 위에서 아래로 훑는 조명 띠
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
+                    let phase = reduceMotion ? 0.5 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) / 5
+                    LinearGradient(colors: [.clear, Color.white.opacity(0.13), .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: h * 0.25)
+                        .position(x: w / 2, y: h * (CGFloat(phase) * 1.5 - 0.25))
+                }
+                // 가장자리를 어둡게
+                RadialGradient(colors: [.clear, Color(hex: 0x000C18).opacity(0.55)], center: .center, startRadius: min(w, h) * 0.35, endRadius: max(w, h) * 0.75)
+                    .allowsHitTesting(false)
             }
+            .clipped()
         }
     }
+
 }

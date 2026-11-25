@@ -12,6 +12,7 @@ struct PlayerDetailView: View {
     private var stats: PlayerStats? { player.stats }
 
     var body: some View {
+        let palette = model.palette(forPlayer: player.id)
         ScrollView {
             VStack(spacing: 10) {
                 hero
@@ -25,7 +26,8 @@ struct PlayerDetailView: View {
             .padding(10)
         }
         .background(Theme.background)
-        .evBrandBars()
+        .environment(\.teamPalette, palette)
+        .evBrandBars(tint: palette.main)
         .navigationTitle(player.shortName)
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -76,6 +78,7 @@ struct PlayerDetailView: View {
                         StatTile(value: chip.value, label: chip.label, icon: chip.icon, highlight: chip.highlight)
                     }
                 }
+                if player.position != .goalkeeper, let goals = stats?.goals { GoalPips(goals) }
             }
         }
         .padding(12)

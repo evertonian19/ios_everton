@@ -54,6 +54,7 @@ struct TeamSquadSection: View {
 struct XIPitchView: View {
     let xi: [XIPlayer]
     let players: [Player]
+    @Environment(\.teamPalette) private var palette
 
     private struct Placed: Identifiable {
         let player: XIPlayer
@@ -78,18 +79,35 @@ struct XIPitchView: View {
     }
 
     var body: some View {
+
         let layout = placed
+        let topGoals = xi.compactMap { x in players.first { $0.id == x.id }?.stats?.goals }.max() ?? 0
         GeometryReader { proxy in
+            let pos: (Placed) -> CGPoint = { item in
+                CGPoint(x: proxy.size.width * CGFloat(item.col) / CGFloat(item.colCount + 1),
+                        y: proxy.size.height * (1 - (CGFloat(item.row) - 0.5) / CGFloat(layout.rowCount)))
+            }
             ZStack {
-                PitchBackground()
+                PitchBackground(palette: palette)
+                // 라인 사이를 잇는 선: 같은 열 순서끼리 연결
+                ForEach(layout.items) { a in
+                    ForEach(layout.items.filter { $0.row == a.row + 1 && $0.col == min(a.col, $0.colCount) }) { b in
+                        Path { path in
+                            path.move(to: pos(a))
+                            path.addLine(to: pos(b))
+                        }
+                        .stroke(palette.glow.opacity(0.22), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+                    }
+                }
                 ForEach(layout.items) { item in
-                    XICell(xi: item.player, player: players.first { $0.id == item.player.id })
-                        .position(
-                            x: proxy.size.width * CGFloat(item.col) / CGFloat(item.colCount + 1),
-                            y: proxy.size.height * (1 - (CGFloat(item.row) - 0.5) / CGFloat(layout.rowCount)))
+                    let goals = players.first { $0.id == item.player.id }?.stats?.goals ?? 0
+                    XICell(xi: item.player, player: players.first { $0.id == item.player.id }, star: topGoals > 0 && goals == topGoals)
+                        .evDrop(delay: Double(item.row - 1) * 0.22 + Double(item.col) * 0.05)
+                        .position(pos(item))
                 }
             }
         }
+
         .aspectRatio(0.72, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Theme.line, lineWidth: 1))
@@ -99,6 +117,7 @@ struct XIPitchView: View {
 private struct XICell: View {
     let xi: XIPlayer
     let player: Player?
+    var star: Bool = false
 
     private var stats: PlayerStats? { player?.stats }
     private var goals: String { stats.map { String($0.goals) } ?? "-" }
@@ -107,27 +126,25 @@ private struct XICell: View {
 
     private var content: some View {
         VStack(spacing: 2) {
-            Text(xi.number.map(String.init) ?? "")
-                .font(.system(size: 13, weight: .heavy))
-                .foregroundStyle(Color(hex: 0x0B1220))
-                .frame(width: 28, height: 28)
-                .background(.white, in: Circle())
+            PitchToken(number: xi.number, star: star)
             Text(xi.shortName)
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 5).padding(.vertical, 1)
-                .background(.black.opacity(0.45), in: Capsule())
+                .background(LinearGradient(colors: [.black.opacity(0.1), .black.opacity(0.7), .black.opacity(0.1)], startPoint: .leading, endPoint: .trailing), in: Capsule())
                 .lineLimit(1)
             Text("⚽\(goals) 🅰\(assists)")
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.white.opacity(hasPoints ? 1 : 0.65))
+                .padding(.horizontal, 6)
+                .background(.black.opacity(0.55), in: Capsule())
         }
         .frame(width: 70)
     }
 
     var body: some View {
         if let player {
-            NavigationLink(value: player) { content }.buttonStyle(.plain)
+            NavigationLink(value: player) { content }.buttonStyle(PressableStyle())
         } else {
             content
         }
@@ -180,5 +197,15 @@ private struct TacticsPanel: View {
                     .font(.caption2).foregroundStyle(Theme.textSecondary)
             }
         }
+    }
+}
+
+/// 누르면 살짝 줄어드는 버튼 효과.
+private struct PressableStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .brightness(configuration.isPressed ? 0.15 : 0)
+            .animation(.spring(duration: 0.2), value: configuration.isPressed)
     }
 }
